@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   Dimensions,
+  Easing,
   Image,
   ImageSourcePropType,
   Modal,
@@ -13,11 +15,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchShopifyProducts, ShopifyProduct } from './src/shopify';
+import { fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AddressPage } from './pages/AddressPage';
+import { CategoriesPage } from './pages/CategoriesPage';
+import { CategoryCollectionPage } from './pages/CategoryCollectionPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ShippingAddress } from './pages/types';
 
@@ -25,6 +29,7 @@ const palette = {
   ink: '#2C2D2E',
   heading: '#1A1C1D',
   blue: '#3F72E5',
+  red: '#E53935',
   paleBlue: '#F5F5F5',
   green: '#34C759',
   muted: '#777777',
@@ -41,19 +46,38 @@ type Product = {
   image: ImageSourcePropType;
   images?: ImageSourcePropType[];
   description?: string;
+  availableForSale?: boolean;
+  brand?: string;
+  vendor?: string;
+  sku?: string;
 };
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
 
-const categories = [
-  ['Audio', require('./assets/figma/category-audio.png')],
-  ['Cameras', require('./assets/figma/category-camera.png')],
-  ['Computers', require('./assets/figma/category-computers.png')],
-  ['Smart Tech', require('./assets/figma/category-smart-tech.png')],
-  ['Home', require('./assets/figma/category-home.png')],
-  ['Lifestyle', require('./assets/figma/category-lifestyle.png')],
-  ['Industry', require('./assets/figma/category-industry.png')],
+const shopCategoryLabels = {
+  Audio: ['Headphones', 'Earbuds', 'Speakers', 'Microphones', 'Soundbars', 'Turntables', 'Audio Accessories'],
+  Capture: ['Cameras', 'Lenses', 'Action Cameras', 'Drones', 'Tripods', 'Lighting', 'Camera Bags'],
+  Computers: ['Laptops', 'Desktops', 'Monitors', 'Keyboards', 'Storage', 'Networking', 'Accessories'],
+  'Smart Tech': ['Smart Watches', 'Phones', 'Tablets', 'Smart Home', 'VR', 'Trackers', 'Chargers'],
+  Home: ['Appliances', 'Kitchen', 'Cleaning', 'Climate', 'Lighting', 'Security', 'Furniture'],
+  Lifestyle: ['Fitness', 'Personal Care', 'Travel', 'Gaming', 'Wearables', 'Outdoors', 'Gifts'],
+  Industry: ['Tools', 'Safety', 'Measuring', 'Automation', 'Power', 'Workshop', 'Components'],
+} as const;
+
+const shopCategoryImages = [
+  require('./assets/figma/category-audio-plain.png'),
+  require('./assets/figma/category-camera-plain.png'),
+  require('./assets/figma/category-computers-plain.png'),
+  require('./assets/figma/category-smart-tech-plain.png'),
+  require('./assets/figma/category-home-plain.png'),
+  require('./assets/figma/category-lifestyle-plain.png'),
+  require('./assets/figma/category-industry-plain.png'),
+  require('./assets/figma/product-57.png'),
+  require('./assets/figma/product-58.png'),
+  require('./assets/figma/product-59.png'),
+  require('./assets/figma/product-60.png'),
+  require('./assets/figma/product-61.png'),
 ] as const;
 
 const banners = [
@@ -71,6 +95,8 @@ const homeMenus = [
   { label: 'Lifestyle', hero: require('./assets/figma/category-lifestyle.png') },
   { label: 'Industry', hero: require('./assets/figma/category-industry.png') },
 ] as const;
+
+const excludedShopifyMenuItems = new Set(['Express Hub', 'Blumaple Business', 'Track Your Order']);
 
 const products: Product[] = [
   { id: 'akg', name: 'AKG Studio Headphones', price: '₹2,345', oldPrice: '₹3,455', discount: '30% off', image: require('./assets/figma/product-headphones.png') },
@@ -101,10 +127,28 @@ function mapShopifyProduct(product: ShopifyProduct): Product {
     image: remoteImages[0] ?? require('./assets/figma/product-headphones.png'),
     images: remoteImages,
     description: product.description,
+    availableForSale: variant?.availableForSale ?? false,
+    brand: product.brandName?.value || product.vendor,
+    vendor: product.vendor,
+    sku: variant?.sku ?? '',
   };
 }
 
-function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFavorite = true }: { item: Product; width: number; favorite: boolean; onFavorite: () => void; onAdd: () => void; onOpen?: () => void; showFavorite?: boolean }) {
+function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFavorite = true, collectionLayout = false }: { item: Product; width: number; favorite: boolean; onFavorite: () => void; onAdd: () => void; onOpen?: () => void; showFavorite?: boolean; collectionLayout?: boolean }) {
+  if (collectionLayout) {
+    const availableForSale = item.availableForSale ?? true;
+    const discountLabel = item.discount ? `-${item.discount.replace(/\s*off/i, '')}` : '';
+    return <View style={[styles.collectionProductCard, { width }]}>
+      <Pressable onPress={onOpen} style={styles.collectionProductVisual}>
+        <Image source={item.image} style={[styles.collectionProductImage, !availableForSale && styles.collectionUnavailable]} resizeMode="contain" />
+        {!availableForSale ? <View style={styles.collectionComingSoon}><Text style={styles.collectionComingSoonText}>Coming soon</Text></View> : discountLabel ? <View style={styles.collectionDiscountBadge}><Text style={styles.collectionDiscountText}>{discountLabel}</Text></View> : null}
+        {showFavorite ? <Pressable hitSlop={10} onPress={onFavorite} style={styles.collectionHeart}><Ionicons name={favorite ? 'heart' : 'heart-outline'} size={21} color={palette.blue} /></Pressable> : null}
+        <Pressable onPress={availableForSale ? onAdd : () => {}} style={[styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction]}><Text style={[styles.collectionImageActionText, !availableForSale && styles.collectionNotifyText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
+      </Pressable>
+      <Text numberOfLines={2} style={[styles.collectionProductName, !availableForSale && styles.collectionUnavailable]}>{item.name}</Text>
+      <View style={[styles.collectionPriceRow, !availableForSale && styles.collectionUnavailable]}><Text style={[styles.collectionPrice, item.oldPrice && styles.collectionSalePrice]}>{item.price}</Text>{item.oldPrice ? <Text numberOfLines={1} style={styles.collectionOldPrice}>{item.oldPrice}</Text> : null}</View>
+    </View>;
+  }
   return (
     <View style={[styles.productCard, { width }]}>
       <Pressable onPress={onOpen} style={styles.productVisual}>
@@ -140,43 +184,51 @@ const detailColors = [
 function ProductDetail({ width, cartCount, product, onBack, onAdd, onCheckout }: { width: number; cartCount: number; product: Product; onBack: () => void; onAdd: () => void; onCheckout: () => void }) {
   const [colorIndex, setColorIndex] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const detailGalleryRef = useRef<ScrollView>(null);
   const choices = product.images?.length ? product.images.map((image, index) => ({ name: index === 0 ? 'Default' : `View ${index + 1}`, image })) : detailColors;
-  const color = choices[colorIndex] ?? choices[0]!;
+  const availableForSale = product.availableForSale ?? true;
   const rows = [
+    ['Key points', product.description ? product.description.split(/[.!?]/).filter(Boolean).slice(0, 3).map(point => `• ${point.trim()}`).join('\n') : `• Premium quality ${product.name}\n• Designed for dependable everyday use\n• Verified product from Blumaple`],
+    ['Warranty / Shipping / Returns', '• Free shipping on eligible orders\n• No additional customs duties will be charged\n• 7-day return policy applies to eligible products\n• Tracking details will be shared after dispatch'],
     ['Product description', product.description || 'Product details are available from the Shopify store.'],
-    ['Ratings and reviews', 'No ratings for this product yet'],
-    ['Frequently asked questions', 'Look for product details'],
+    ['Specifications & details', `SKU: ${product.sku || 'Not specified'}\nBrand: ${product.brand || 'Not specified'}\nShipping: ${product.vendor || 'Not specified'}`],
   ] as const;
 
   return <View style={[styles.detailPage, { width }]}>
-    <View style={styles.detailHeader}>
-      <Pressable onPress={onBack} hitSlop={12}><Ionicons name="arrow-back" size={25} color={palette.ink} /></Pressable>
-      <View style={styles.detailHeaderActions}>
-        <Ionicons name="search-outline" size={27} color={palette.blue} />
-        <Ionicons name="share-social-outline" size={27} color={palette.blue} />
-        <View><Ionicons name="cart-outline" size={31} color={palette.blue} />{cartCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{cartCount}</Text></View>}</View>
-      </View>
-    </View>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailContent}>
-      <Image source={color.image} style={styles.detailHero} resizeMode="contain" />
-      <View style={styles.detailDots}>{choices.map((_, i) => <View key={i} style={[styles.detailDot, i === colorIndex && styles.detailDotActive]} />)}</View>
-      <Text style={styles.selectedColor}><Text style={styles.selectedColorBold}>Selected Color: </Text>{color.name}</Text>
-      <View style={styles.swatches}>{choices.map((option, index) => <Pressable key={`${option.name}-${index}`} onPress={() => setColorIndex(index)} style={[styles.swatch, index === colorIndex && styles.swatchActive]}><Image source={option.image} style={styles.swatchImage} resizeMode="contain" /></Pressable>)}</View>
-      <Text style={styles.detailTitle}>{product.name}</Text>
-      <View style={styles.detailPriceRow}><Text style={styles.detailPrice}>{product.price}</Text>{product.oldPrice ? <Text style={styles.detailOldPrice}>{product.oldPrice}</Text> : null}{product.discount ? <Text style={styles.detailDiscount}>{product.discount}</Text> : null}</View>
-      <Text style={styles.inclusive}>Inclusive of all offers</Text>
-      <View style={styles.offers}>
-        <View style={styles.offerTitle}><Ionicons name="pricetag" size={22} color={palette.blue} /><Text style={styles.offerTitleText}>Apply offers to save more</Text><Ionicons name="chevron-forward" size={21} color={palette.ink} /></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offerRow}>{[0, 1].map(i => <View key={i} style={styles.offerCard}><Text style={styles.offerText}><Text style={{ fontWeight: '700' }}>Bank Offer: </Text>10% instant discount on HDFC Bank cards</Text></View>)}</ScrollView>
+      <View style={styles.detailHeroSection}>
+        <ScrollView ref={detailGalleryRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} bounces={false} style={styles.detailGallery} onMomentumScrollEnd={event => setColorIndex(Math.round(event.nativeEvent.contentOffset.x / width))}>
+          {choices.map((option, index) => <Image key={`hero-${option.name}-${index}`} source={option.image} style={[styles.detailHero, { width }]} resizeMode="contain" />)}
+        </ScrollView>
+        <View style={styles.detailOverlayHeader}>
+          <Pressable onPress={onBack} style={styles.detailCircleButton}><Ionicons name="chevron-down" size={28} color={palette.ink} /></Pressable>
+          <View style={styles.detailOverlayActions}><Pressable style={styles.detailCircleButton}><Ionicons name="heart-outline" size={26} color={palette.ink} /></Pressable><Pressable style={styles.detailCircleButton}><Ionicons name="search-outline" size={25} color={palette.ink} /></Pressable><Pressable style={styles.detailCircleButton}><Ionicons name="share-social-outline" size={25} color={palette.ink} /></Pressable></View>
+        </View>
+        <View style={styles.detailDots}>{choices.map((_, i) => <View key={i} style={[styles.detailDot, i === colorIndex && styles.detailDotActive]} />)}</View>
       </View>
-      <Text style={styles.detailSectionTitle}>Delivery details</Text>
-      <View style={styles.deliveryBox}><Ionicons name="location-outline" size={23} /><Text style={styles.pin}>530013</Text><Text style={styles.deliveryLink}>Select delivery location</Text><Ionicons name="chevron-forward" size={18} /></View>
-      <View style={styles.deliveryBox}><Ionicons name="cube-outline" size={23} /><Text style={styles.deliveryText}><Text style={{ color: 'green', fontWeight: '800' }}>Free</Text> Delivery by 26 Aug, Wed</Text></View>
-      {rows.map(([title, copy]) => { const open = expanded === title; return <Pressable key={title} onPress={() => setExpanded(open ? null : title)} style={styles.accordion}><View style={styles.accordionHeading}><Text style={styles.accordionTitle}>{title}</Text><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} /></View><Text style={styles.accordionCopy}>{copy}</Text></Pressable>; })}
-      <Text style={styles.similarTitle}>Similar Products</Text>
-      <View style={styles.grid}>{products.slice(0, 4).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={(width - 35) / 2} favorite={false} onFavorite={() => {}} onAdd={onAdd} />)}</View>
+      {choices.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailThumbnailScroller} contentContainerStyle={styles.detailThumbnails}>{choices.map((option, index) => <Pressable key={`${option.name}-${index}`} onPress={() => { setColorIndex(index); detailGalleryRef.current?.scrollTo({ x: index * width, animated: true }); }} style={[styles.detailThumbnail, index === colorIndex && styles.detailThumbnailActive]}><Image source={option.image} style={styles.swatchImage} resizeMode="contain" /></Pressable>)}</ScrollView> : null}
+      <View style={styles.detailInfoCard}>
+        <Text style={styles.detailTitle}>{product.name}</Text>
+        <Text style={styles.detailUnit}>1 unit</Text>
+        <View style={styles.detailPriceRow}><Text style={styles.detailPrice}>{product.price}</Text>{product.oldPrice ? <Text style={styles.detailOldPrice}>{product.oldPrice}</Text> : null}{product.discount ? <Text style={styles.detailDiscount}>{product.discount}</Text> : null}</View>
+        <Text style={styles.inclusive}>Inclusive of all taxes · Free shipping</Text>
+      </View>
+      <View style={styles.detailInfoCard}><Text style={styles.detailBrand}>{product.brand || 'Blumaple verified brand'}</Text><Text style={styles.detailMuted}>Shipping: {product.vendor || 'Warehouse information unavailable'}</Text></View>
+      <View style={styles.detailInfoCard}>
+        <View style={styles.detailStockRow}><View style={[styles.stockDot, !availableForSale && styles.stockDotUnavailable]} /><Text style={[styles.stockText, !availableForSale && styles.stockTextUnavailable]}>{availableForSale ? 'In stock' : 'Coming soon'}</Text></View>
+        <View style={styles.quantityRow}><Text style={styles.quantityLabel}>Quantity</Text><View style={styles.quantityControl}><Pressable onPress={() => setQuantity(value => Math.max(1, value - 1))}><Text style={styles.quantityButton}>−</Text></Pressable><Text style={styles.quantityValue}>{quantity}</Text><Pressable onPress={() => setQuantity(value => value + 1)}><Text style={styles.quantityButton}>+</Text></Pressable></View></View>
+        <Text style={styles.genuineText}>100% GENUINE PRODUCTS GUARANTEED</Text>
+        <Text style={styles.deliveryEstimate}>Estimated delivery: 3–7 business days</Text>
+        <View style={styles.codBox}><Text style={styles.codText}>Cash on Delivery accepted</Text></View>
+        {availableForSale ? <Pressable onPress={onCheckout} style={styles.buyNowButton}><Text style={styles.buyNowButtonText}>BUY IT NOW</Text></Pressable> : null}
+      </View>
+      {rows.map(([title, copy]) => { const open = expanded === title; return <Pressable key={title} onPress={() => setExpanded(open ? null : title)} style={styles.accordion}><View style={styles.accordionHeading}><Text style={styles.accordionTitle}>{title}</Text><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} /></View>{open ? <Text style={styles.accordionCopy}>{copy}</Text> : null}</Pressable>; })}
+      <Text style={styles.similarTitle}>You may also like</Text>
+      <Text style={styles.similarSubtitle}>Combine your style with these products</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.detailRecommendations}>{products.slice(0, 6).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={150} favorite={false} collectionLayout onFavorite={() => {}} onAdd={onAdd} />)}</ScrollView>
     </ScrollView>
-    <View style={styles.buyBar}><Pressable onPress={onAdd} style={styles.addLarge}><Text style={styles.addLargeText}>Add to cart</Text></Pressable><Pressable onPress={onCheckout} style={styles.buyLarge}><Text numberOfLines={1} style={styles.buyLargeText}>Buy at {product.price}</Text></Pressable></View>
+    <View style={styles.buyBar}><View><Text style={styles.buyBarUnit}>1 unit</Text><Text style={styles.buyBarPrice}>{product.price}</Text><Text style={styles.buyBarTax}>Inclusive of all taxes</Text></View><Pressable onPress={availableForSale ? onAdd : () => {}} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}><Text style={styles.addLargeText}>{availableForSale ? 'Add to cart' : 'Notify me'}</Text></Pressable></View>
   </View>;
 }
 
@@ -185,14 +237,25 @@ function Storefront() {
   const screenWidth = Dimensions.get('window').width;
   const contentWidth = Math.min(screenWidth, 440);
   const cardWidth = Math.max(156, (contentWidth - 46) / 2);
+  const trendingCardWidth = Math.max(138, (contentWidth - 96) / 2);
   const carouselCardWidth = Math.round((contentWidth - 20) / 2);
   const carouselStep = carouselCardWidth + 12;
   const [activeBanner, setActiveBanner] = useState(0);
   const [activeCategory, setActiveCategory] = useState('Audio');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [cartCount, setCartCount] = useState(0);
-  const [screen, setScreen] = useState<'home' | 'collection' | 'product' | 'checkout' | 'address'>('home');
+  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'product' | 'checkout' | 'address'>('home');
   const [shopifyProducts, setShopifyProducts] = useState<Product[]>([]);
+  const [shopifyMenuItems, setShopifyMenuItems] = useState<ShopifyMenuItem[]>([]);
+  const [shopifyCollectionPreviews, setShopifyCollectionPreviews] = useState<Record<string, ShopifyCollectionPreview>>({});
+  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState<ShopifyMenuItem | null>(null);
+  const [selectedCollectionItem, setSelectedCollectionItem] = useState<ShopifyMenuItem | null>(null);
+  const [collectionPageProducts, setCollectionPageProducts] = useState<ShopifyProduct[]>([]);
+  const [collectionPageLoading, setCollectionPageLoading] = useState(false);
+  const [collectionPageLoadingMore, setCollectionPageLoadingMore] = useState(false);
+  const [collectionPageHasNext, setCollectionPageHasNext] = useState(false);
+  const [collectionPageCursor, setCollectionPageCursor] = useState<string | null>(null);
+  const [collectionPageTotal, setCollectionPageTotal] = useState<number | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [shopifyError, setShopifyError] = useState<string | null>(null);
@@ -200,14 +263,88 @@ function Storefront() {
   const [pincodeModalVisible, setPincodeModalVisible] = useState(false);
   const [pincode, setPincode] = useState('');
   const [uploadedCarousels, setUploadedCarousels] = useState<UploadedCarouselData>({});
+  const [openingAnimationVisible, setOpeningAnimationVisible] = useState(true);
   const carouselRef = useRef<ScrollView>(null);
+  const transportProgress = useRef(new Animated.Value(0)).current;
+  const openingProgress = useRef(new Animated.Value(0)).current;
+  const flightTranslateX = transportProgress.interpolate({
+    inputRange: [0, 0.6, 1],
+    outputRange: [10, contentWidth + 52, contentWidth + 52],
+  });
+  const truckTranslateX = transportProgress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [-52, -52, contentWidth + 52],
+  });
+  const nextFlightTranslateX = transportProgress.interpolate({
+    inputRange: [0, 0.8, 1],
+    outputRange: [10 - (contentWidth + 42) / 3, 10 - (contentWidth + 42) / 3, 10],
+  });
+  const openingFlightTranslateX = openingProgress.interpolate({
+    inputRange: [0, 0.6, 1],
+    outputRange: [-180, contentWidth + 180, contentWidth + 180],
+  });
+  const openingTruckTranslateX = openingProgress.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [-180, -180, contentWidth + 180],
+  });
+  const openingFlightOpacity = openingProgress.interpolate({ inputRange: [0, 0.59, 0.62, 1], outputRange: [0.5, 0.5, 0, 0] });
+  const openingTruckOpacity = openingProgress.interpolate({ inputRange: [0, 0.38, 0.4, 1], outputRange: [0, 0, 0.5, 0.5] });
   const catalog = shopifyProducts.length ? shopifyProducts : products;
   const recommendations = useMemo(() => catalog.slice(0, 4), [catalog]);
-  const activeHomeMenu = homeMenus.find(menu => menu.label === activeCategory) ?? homeMenus[0]!;
-  const categoryIndex = Math.max(0, homeMenus.findIndex(menu => menu.label === activeHomeMenu.label));
+  const filteredShopifyMenuItems = useMemo(
+    () => shopifyMenuItems.filter(item => !excludedShopifyMenuItems.has(item.title.trim())),
+    [shopifyMenuItems],
+  );
+  const displayHomeMenus = useMemo(() => filteredShopifyMenuItems.length
+    ? filteredShopifyMenuItems.map((item, index) => ({ label: item.title.trim(), hero: homeMenus[index % homeMenus.length]!.hero }))
+    : [...homeMenus],
+  [filteredShopifyMenuItems]);
+  const activeHomeMenu = displayHomeMenus.find(menu => menu.label === activeCategory) ?? displayHomeMenus[0]!;
+  const activeShopifyMenu = filteredShopifyMenuItems.find(item => item.title.trim() === activeHomeMenu.label);
+  const categoryIndex = Math.max(0, displayHomeMenus.findIndex(menu => menu.label === activeHomeMenu.label));
+  const shopCategories = useMemo(
+    () => {
+      const collectionItems = activeShopifyMenu?.items.flatMap(group => group.items.length
+        ? group.items.map(collection => ({ collection, group }))
+        : [{ collection: group, group }]) ?? [];
+      return collectionItems.length
+        ? collectionItems.map(({ collection, group }, index) => {
+          const preview = collection.resource ? shopifyCollectionPreviews[collection.resource.id] : undefined;
+          const firstProductImage = preview?.products.nodes[0]?.images.nodes[0]?.url;
+          return {
+            id: collection.id,
+            label: collection.title.trim(),
+            image: firstProductImage ? { uri: firstProductImage } as ImageSourcePropType : shopCategoryImages[(index + categoryIndex * 2) % shopCategoryImages.length]!,
+            collection,
+            group,
+          };
+        })
+        : (shopCategoryLabels[activeHomeMenu.label as keyof typeof shopCategoryLabels] ?? []).map((label, index) => ({
+          id: `${activeHomeMenu.label}-${label}`,
+          label,
+          image: shopCategoryImages[(index + categoryIndex * 2) % shopCategoryImages.length]!,
+          collection: undefined,
+          group: undefined,
+        }));
+    },
+    [activeHomeMenu.label, activeShopifyMenu, categoryIndex, shopifyCollectionPreviews],
+  );
   const categoryProducts = useMemo(
-    () => Array.from({ length: Math.min(5, catalog.length) }, (_, index) => catalog[(categoryIndex + index) % catalog.length]!).filter(Boolean),
-    [catalog, categoryIndex],
+    () => {
+      const seen = new Set<string>();
+      const menuProducts = (activeShopifyMenu?.items.flatMap(group => [group, ...group.items]) ?? [])
+        .map(item => item.resource ? shopifyCollectionPreviews[item.resource.id]?.products.nodes[0] : undefined)
+        .filter((product): product is ShopifyProduct => Boolean(product))
+        .filter(product => {
+          if (seen.has(product.id)) return false;
+          seen.add(product.id);
+          return true;
+        })
+        .map(mapShopifyProduct);
+      if (menuProducts.length) return menuProducts;
+      return Array.from({ length: Math.min(5, catalog.length) }, (_, index) => catalog[(categoryIndex + index) % catalog.length]!).filter(Boolean);
+    },
+    [activeShopifyMenu, catalog, categoryIndex, shopifyCollectionPreviews],
   );
   const carouselProducts = useMemo(
     () => Array.from({ length: 4 }, (_, index) => categoryProducts[index % categoryProducts.length] ?? products[0]!),
@@ -216,15 +353,52 @@ function Storefront() {
   const browserCarouselApiUrl = typeof window !== 'undefined' && window.location ? `${window.location.protocol}//${window.location.hostname}:3001/api/carousels` : '';
   const carouselApiUrl = process.env.EXPO_PUBLIC_CAROUSEL_API_URL ?? browserCarouselApiUrl;
   const uploadedSlides = uploadedCarousels[activeHomeMenu.label]?.filter(slide => slide.image) ?? [];
-  const carouselSlides = useMemo(() => uploadedSlides.length
-    ? uploadedSlides.map((slide, index) => ({ id: slide.id, image: { uri: slide.image } as ImageSourcePropType, title: slide.title || `${activeHomeMenu.label} picks`, subtitle: slide.collection ? `Shop ${slide.collection}` : `Trending ${activeHomeMenu.label.toLowerCase()} pick`, product: categoryProducts[index % categoryProducts.length] ?? products[0]! }))
-    : carouselProducts.map(item => ({ id: item.id, image: item.image, title: item.name, subtitle: `Trending ${activeHomeMenu.label.toLowerCase()} pick`, product: item })),
-  [activeHomeMenu.label, carouselProducts, categoryProducts, uploadedSlides]);
+  const carouselSlides = useMemo(() => activeShopifyMenu?.items.length
+    ? activeShopifyMenu.items.map((item, index) => {
+      const preview = item.resource ? shopifyCollectionPreviews[item.resource.id] : undefined;
+      const shopifyProduct = preview?.products.nodes[0];
+      const product = shopifyProduct ? mapShopifyProduct(shopifyProduct) : categoryProducts[index % categoryProducts.length] ?? products[0]!;
+      return { id: item.id, image: product.image, title: item.title.trim(), subtitle: '', product, category: item };
+    })
+    : uploadedSlides.length
+      ? uploadedSlides.map((slide, index) => ({ id: slide.id, image: { uri: slide.image } as ImageSourcePropType, title: slide.title || `${activeHomeMenu.label} picks`, subtitle: slide.collection ? `Shop ${slide.collection}` : `Trending ${activeHomeMenu.label.toLowerCase()} pick`, product: categoryProducts[index % categoryProducts.length] ?? products[0]!, category: undefined }))
+      : carouselProducts.map(item => ({ id: item.id, image: item.image, title: item.name, subtitle: `Trending ${activeHomeMenu.label.toLowerCase()} pick`, product: item, category: undefined })),
+  [activeHomeMenu.label, activeShopifyMenu, carouselProducts, categoryProducts, shopifyCollectionPreviews, uploadedSlides]);
+  const carouselSlideCount = Math.max(1, carouselSlides.length);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: carouselStep * 4, animated: false }));
+    if (screen !== 'home' && screen !== 'categories') return;
+    transportProgress.setValue(0);
+    const transportAnimation = Animated.loop(Animated.timing(transportProgress, {
+      toValue: 1,
+      duration: 8000,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }));
+    transportAnimation.start();
+    return () => transportAnimation.stop();
+  }, [contentWidth, screen, transportProgress]);
+
+  useEffect(() => {
+    openingProgress.setValue(0);
+    const openingAnimation = Animated.timing(openingProgress, {
+      toValue: 1,
+      duration: 5200,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    openingAnimation.start(({ finished }) => {
+      if (finished) setOpeningAnimationVisible(false);
+    });
+    return () => openingAnimation.stop();
+  }, [contentWidth, openingProgress]);
+
+  useEffect(() => {
+    if (screen !== 'home') return;
+    setActiveBanner(0);
+    const frame = requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: carouselStep * carouselSlideCount, animated: false }));
     return () => cancelAnimationFrame(frame);
-  }, [activeHomeMenu.label, carouselStep]);
+  }, [activeHomeMenu.label, carouselSlideCount, carouselStep, screen]);
 
   useEffect(() => {
     fetchShopifyProducts()
@@ -235,6 +409,72 @@ function Storefront() {
       .catch(error => setShopifyError(error instanceof Error ? error.message : 'Unable to load Shopify products.'))
       .finally(() => setShopifyLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchShopifyMainMenu()
+      .then(items => setShopifyMenuItems(items))
+      .catch(() => setShopifyMenuItems([]));
+  }, []);
+
+  useEffect(() => {
+    const menuCollections = screen === 'categories'
+      ? filteredShopifyMenuItems.flatMap(menu => menu.items.flatMap(group => [group, ...group.items]))
+      : activeShopifyMenu?.items.flatMap(group => [group, ...group.items]) ?? [];
+    const collectionIds = [...new Set(menuCollections.map(item => item.resource?.id).filter((id): id is string => Boolean(id)))];
+    if (!collectionIds.length) return;
+    fetchShopifyCollectionPreviews(collectionIds)
+      .then(previews => setShopifyCollectionPreviews(current => ({
+        ...current,
+        ...Object.fromEntries(previews.map(preview => [preview.id, preview])),
+      })))
+      .catch(() => undefined);
+  }, [activeShopifyMenu, filteredShopifyMenuItems, screen]);
+
+  useEffect(() => {
+    const collectionId = selectedCollectionItem?.resource?.id;
+    if (screen !== 'categoryCollection' || !collectionId) return;
+    let cancelled = false;
+    setCollectionPageLoading(true);
+    setCollectionPageProducts([]);
+    setCollectionPageHasNext(false);
+    setCollectionPageCursor(null);
+    setCollectionPageTotal(null);
+    fetchShopifyCollectionProducts(collectionId)
+      .then(page => {
+        if (cancelled) return;
+        setCollectionPageProducts(page.products);
+        setCollectionPageHasNext(page.hasNextPage);
+        setCollectionPageCursor(page.endCursor);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCollectionPageProducts([]);
+        setCollectionPageHasNext(false);
+        setCollectionPageCursor(null);
+      })
+      .finally(() => { if (!cancelled) setCollectionPageLoading(false); });
+    fetchShopifyCollectionProductCount(collectionId)
+      .then(total => { if (!cancelled) setCollectionPageTotal(total); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [screen, selectedCollectionItem]);
+
+  const loadMoreCollectionProducts = () => {
+    const collectionId = selectedCollectionItem?.resource?.id;
+    if (!collectionId || !collectionPageHasNext || !collectionPageCursor || collectionPageLoadingMore) return;
+    setCollectionPageLoadingMore(true);
+    fetchShopifyCollectionProducts(collectionId, 30, collectionPageCursor)
+      .then(page => {
+        setCollectionPageProducts(current => {
+          const existingIds = new Set(current.map(product => product.id));
+          return [...current, ...page.products.filter(product => !existingIds.has(product.id))];
+        });
+        setCollectionPageHasNext(page.hasNextPage);
+        setCollectionPageCursor(page.endCursor);
+      })
+      .catch(() => undefined)
+      .finally(() => setCollectionPageLoadingMore(false));
+  };
 
   useEffect(() => {
     if (!carouselApiUrl) return;
@@ -256,6 +496,25 @@ function Storefront() {
     <ProductCard key={item.id} item={item} width={cardWidth} favorite={favorites.has(item.id)} onFavorite={() => toggleFavorite(item.id)} onAdd={() => addToCart(item)} onOpen={() => { setSelectedProduct(item); setScreen('product'); }} />
   );
 
+  if (screen === 'categoryCollection' && selectedCategoryGroup && selectedCollectionItem) return <SafeAreaView style={styles.safeArea}>
+    <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+    <CategoryCollectionPage
+      category={selectedCategoryGroup}
+      selectedCollection={selectedCollectionItem}
+      previews={shopifyCollectionPreviews}
+      products={collectionPageProducts}
+      loading={collectionPageLoading}
+      totalProducts={collectionPageTotal}
+      loadingMore={collectionPageLoadingMore}
+      hasNextPage={collectionPageHasNext}
+      onLoadMore={loadMoreCollectionProducts}
+      onBack={() => setScreen('home')}
+      onSelectCollection={setSelectedCollectionItem}
+      onAdd={() => setCartCount(value => value + 1)}
+      onOpenProduct={product => { setSelectedProduct(mapShopifyProduct(product)); setScreen('product'); }}
+    />
+  </SafeAreaView>;
+
   if (screen === 'product' && selectedProduct) {
     return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} onBack={() => setScreen('home')} onAdd={() => setCartCount(value => value + 1)} onCheckout={() => { setCartCount(value => Math.max(1, value)); setScreen('checkout'); }} /></SafeAreaView>;
   }
@@ -266,16 +525,25 @@ function Storefront() {
 
   return (
     <SafeAreaView style={[styles.safeArea, screen === 'home' && styles.homeSafeArea]}>
-      <StatusBar barStyle="dark-content" backgroundColor={screen === 'home' ? '#BED0F7' : '#F5F5F5'} translucent={false} />
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" translucent={false} />
       <View style={[styles.app, { width: contentWidth }]}>
         {screen === 'collection' ? <View style={styles.collectionHeader}>
           <Pressable onPress={() => setScreen('home')} hitSlop={10}><Ionicons name="arrow-back" size={19} color={palette.ink} /></Pressable>
           <Text style={styles.collectionHeaderTitle}>AUDIO</Text>
           <View style={styles.collectionHeaderActions}><Ionicons name="search-outline" size={20} color={palette.blue} /><Ionicons name="cart-outline" size={22} color={palette.blue} /></View>
         </View> : <View style={styles.deliveryHeader}>
+          <Animated.View pointerEvents="none" style={[styles.headerFlight, { transform: [{ translateX: flightTranslateX }] }]}>
+            <Ionicons name="airplane" size={38} color={palette.blue} />
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[styles.headerTruck, { transform: [{ translateX: truckTranslateX }] }]}>
+            <MaterialCommunityIcons name="truck-fast-outline" size={42} color={palette.red} />
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[styles.headerFlight, { transform: [{ translateX: nextFlightTranslateX }] }]}>
+            <Ionicons name="airplane" size={38} color={palette.blue} />
+          </Animated.View>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple logo.png')} style={styles.deliveryLogo} resizeMode="contain" />
-            <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={16} color={palette.blue} /><Text style={styles.addAddressText}>Check Delivery</Text></Pressable>
+            <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>Deliver to..</Text></Pressable>
           </View>
           <View style={styles.deliveryActions}>
             <View>
@@ -285,20 +553,20 @@ function Storefront() {
           </View>
         </View>}
 
-        {screen === 'home' && <View style={styles.staticSearchZone}>
+        {(screen === 'home' || screen === 'categories') && <View style={styles.staticSearchZone}>
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={20} color={palette.ink} />
             <TextInput placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
           </View>
         </View>}
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false} overScrollMode="never" contentContainerStyle={styles.content}>
           {screen === 'home' ? <>
           <View style={styles.carouselHeaderZone}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.blinkTabs}>
-            {homeMenus.map((menu) => (
+            {displayHomeMenus.map((menu) => (
               <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, activeCategory === menu.label && styles.blinkTabActive]}>
-                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={29} color={palette.ink} />
+                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={29} color={activeCategory === menu.label ? palette.white : palette.ink} />
                 <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
                 {activeCategory === menu.label && <View style={styles.blinkTabIndicator} />}
               </Pressable>
@@ -314,32 +582,66 @@ function Storefront() {
             overScrollMode="never"
             onMomentumScrollEnd={event => {
               const index = Math.round(event.nativeEvent.contentOffset.x / carouselStep);
-              setActiveBanner(index % 4);
-              if (index >= 8) requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: (index - 4) * carouselStep, animated: false }));
-              if (index <= 0) requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: (index + 4) * carouselStep, animated: false }));
+              setActiveBanner(index % carouselSlideCount);
+              if (index >= carouselSlideCount * 2) requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: (index - carouselSlideCount) * carouselStep, animated: false }));
+              if (index <= 0) requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: (index + carouselSlideCount) * carouselStep, animated: false }));
             }}
             contentContainerStyle={[styles.promoCards, { paddingHorizontal: carouselCardWidth / 2 }]}
           >
-            {[...carouselSlides, ...carouselSlides, ...carouselSlides].map((slide, index) => <Pressable key={`${activeHomeMenu.label}-${slide.id}-${index}`} style={[styles.promoCard, { width: carouselCardWidth }]} onPress={() => { setSelectedProduct(slide.product); setScreen('product'); }}>
-              <Image source={slide.image} style={styles.promoImage} resizeMode="contain" />
-              <View style={styles.promoShade} /><View style={styles.promoCopy}><Text numberOfLines={2} style={styles.promoTitle}>{slide.title}</Text><Text style={styles.promoSubtitle}>{slide.subtitle}</Text><View style={styles.promoArrow}><Ionicons name="chevron-forward" size={18} color={palette.white} /></View></View>
+            {[...carouselSlides, ...carouselSlides, ...carouselSlides].map((slide, index) => <Pressable key={`${activeHomeMenu.label}-${slide.id}-${index}`} style={[styles.promoCard, { width: carouselCardWidth }]} onPress={() => {
+              if (slide.category) {
+                const firstCollection = slide.category.items[0] ?? slide.category;
+                setSelectedCategoryGroup(slide.category);
+                setSelectedCollectionItem(firstCollection);
+                setScreen('categoryCollection');
+              } else {
+                setSelectedProduct(slide.product);
+                setScreen('product');
+              }
+            }}>
+              <View style={styles.promoImageFrame}><Image source={slide.image} style={styles.promoImage} resizeMode="contain" /></View>
+              <View style={styles.promoCopy}><Text numberOfLines={2} style={styles.promoTitle}>{slide.title}</Text>{slide.subtitle ? <Text style={styles.promoSubtitle}>{slide.subtitle}</Text> : null}</View>
             </Pressable>)}
           </ScrollView>
-          <View style={styles.dots}>{[0, 1, 2, 3].map(index => <View key={index} style={[styles.dot, index === activeBanner && styles.dotActive]} />)}</View>
+          <View style={styles.dots}>{Array.from({ length: carouselSlideCount }).map((_, index) => <View key={index} style={[styles.dot, index === activeBanner && styles.dotActive]} />)}</View>
           </View>
           </View>
           <View style={styles.zigzagPartition}>{Array.from({ length: 30 }).map((_, index) => <View key={index} style={styles.zigzagTooth} />)}</View>
           <View style={styles.homeProductSections}>
-          <SectionTitle>Trending in {activeHomeMenu.label}</SectionTitle>
-          <View style={styles.trendingRow}>
-            {categoryProducts.slice(0, 3).map(item => <Pressable key={`explore-${activeHomeMenu.label}-${item.id}`} style={[styles.exploreCard, styles.trendingCard]} onPress={() => { setSelectedProduct(item); setScreen('product'); }}><Image source={item.image} style={styles.exploreImage} resizeMode="contain" /><Ionicons name="heart" size={16} color={palette.white} style={styles.exploreHeart} /><Text numberOfLines={1} style={styles.exploreName}>{item.name}</Text></Pressable>)}
+          <SectionTitle>Shop by Category</SectionTitle>
+          <View style={styles.shopCategoryGrid}>
+            {shopCategories.map(({ id, label, image, collection, group }) => <Pressable key={id} style={styles.shopCategoryItem} onPress={() => {
+              if (collection && group) {
+                setSelectedCategoryGroup(group);
+                setSelectedCollectionItem(collection);
+                setScreen('categoryCollection');
+              } else {
+                setScreen('collection');
+              }
+            }}>
+              <View style={styles.shopCategoryImageBlock}><Image source={image} style={styles.shopCategoryImage} resizeMode="contain" /></View>
+              <Text numberOfLines={2} style={styles.shopCategoryLabel}>{label}</Text>
+            </Pressable>)}
           </View>
-          <Pressable onPress={() => setScreen('collection')} style={styles.seeMoreButton}><Text style={styles.seeMoreText}>See more products</Text><Ionicons name="arrow-forward" size={15} color={palette.blue} /></Pressable>
-          <SectionTitle>Best selling {activeHomeMenu.label}</SectionTitle>
-          <View style={styles.grid}>{categoryProducts.slice(0, 4).map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={cardWidth} favorite={favorites.has(item.id)} showFavorite={false} onFavorite={() => toggleFavorite(item.id)} onAdd={() => addToCart(item)} onOpen={() => { setSelectedProduct(item); setScreen('product'); }} />)}</View>
+          <SectionTitle>Trending</SectionTitle>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
+            {categoryProducts.map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item.id)} onAdd={() => addToCart(item)} onOpen={() => { setSelectedProduct(item); setScreen('product'); }} />)}
+          </ScrollView>
+          <SectionTitle>Best Selling</SectionTitle>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
+            {categoryProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item.id)} onAdd={() => addToCart(item)} onOpen={() => { setSelectedProduct(item); setScreen('product'); }} />)}
+          </ScrollView>
           </View>
 
-          </> : <>
+          </> : screen === 'categories' ? <CategoriesPage
+            menuItems={filteredShopifyMenuItems}
+            previews={shopifyCollectionPreviews}
+            onSelectCollection={(category, collection) => {
+              setSelectedCategoryGroup(category);
+              setSelectedCollectionItem(collection);
+              setScreen('categoryCollection');
+            }}
+          /> : <>
             <View style={styles.audioHubHeading}>
               <Text style={styles.audioHubTitle}>The Audio Hub</Text>
               <Text style={styles.audioHubLink}>Explore All Audio Products →</Text>
@@ -368,23 +670,23 @@ function Storefront() {
         </ScrollView>
         <View style={styles.floatingFooter}>
           <Pressable onPress={() => setScreen('home')} style={styles.footerTab}>
-            <Ionicons name={screen === 'home' ? 'home' : 'home-outline'} size={18} color={screen === 'home' ? palette.blue : palette.muted} />
+            <Ionicons name={screen === 'home' ? 'home' : 'home-outline'} size={25} color={screen === 'home' ? palette.blue : palette.muted} />
             <Text style={[styles.footerTabText, screen === 'home' && styles.footerTabActive]}>Home</Text>
           </Pressable>
-          <Pressable onPress={() => setScreen('collection')} style={styles.footerTab}>
-            <Ionicons name={screen === 'collection' ? 'grid' : 'grid-outline'} size={18} color={screen === 'collection' ? palette.blue : palette.muted} />
-            <Text style={[styles.footerTabText, screen === 'collection' && styles.footerTabActive]}>Categories</Text>
+          <Pressable onPress={() => setScreen('categories')} style={styles.footerTab}>
+            <Ionicons name={screen === 'categories' ? 'grid' : 'grid-outline'} size={25} color={screen === 'categories' ? palette.blue : palette.muted} />
+            <Text style={[styles.footerTabText, screen === 'categories' && styles.footerTabActive]}>Categories</Text>
           </Pressable>
           <Pressable onPress={() => selectedProduct && setScreen('checkout')} style={styles.footerTab}>
-            <Ionicons name="bag-handle-outline" size={18} color="#555" />
+            <Ionicons name="bag-handle-outline" size={25} color="#555" />
             <Text style={styles.footerTabText}>Orders</Text>
           </Pressable>
           <Pressable style={styles.footerTab}>
-            <Ionicons name="heart-outline" size={18} color="#555" />
+            <Ionicons name="heart-outline" size={25} color="#555" />
             <Text style={styles.footerTabText}>Wishlist</Text>
           </Pressable>
           <Pressable style={styles.footerTab}>
-            <Ionicons name="person-outline" size={18} color="#555" />
+            <Ionicons name="person-outline" size={25} color="#555" />
             <Text style={styles.footerTabText}>Account</Text>
           </Pressable>
         </View>
@@ -400,6 +702,21 @@ function Storefront() {
         </Pressable>
       </Modal>
       {screen === 'home' ? <View pointerEvents="none" style={[styles.bottomSafeFill, { height: insets.bottom }]} /> : null}
+      {openingAnimationVisible ? <View pointerEvents="none" style={styles.openingAnimationOverlay}>
+        <Text style={styles.openingAnimationMessage}>Discover world‑class products, curated for you.</Text>
+        {[
+          { top: '10%', left: -80, size: 42 }, { top: '23%', left: 20, size: 50 }, { top: '37%', left: -25, size: 39 },
+          { top: '58%', left: 55, size: 47 }, { top: '72%', left: -55, size: 44 }, { top: '86%', left: 10, size: 51 },
+        ].map((vehicle, index) => <Animated.View key={`opening-flight-${index}`} style={[styles.openingVehicle, { top: vehicle.top as `${number}%`, left: vehicle.left, opacity: openingFlightOpacity, transform: [{ translateX: openingFlightTranslateX }] }]}>
+          <Ionicons name="airplane" size={vehicle.size} color={palette.blue} />
+        </Animated.View>)}
+        {[
+          { top: '13%', left: 35, size: 48 }, { top: '28%', left: -65, size: 43 }, { top: '43%', left: 5, size: 52 },
+          { top: '61%', left: -20, size: 45 }, { top: '76%', left: 65, size: 50 }, { top: '89%', left: -70, size: 46 },
+        ].map((vehicle, index) => <Animated.View key={`opening-truck-${index}`} style={[styles.openingVehicle, { top: vehicle.top as `${number}%`, left: vehicle.left, opacity: openingTruckOpacity, transform: [{ translateX: openingTruckTranslateX }] }]}>
+          <MaterialCommunityIcons name="truck-fast-outline" size={vehicle.size} color={palette.red} />
+        </Animated.View>)}
+      </View> : null}
     </SafeAreaView>
   );
 }
@@ -411,19 +728,24 @@ export default function App() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F5F5F5' },
-  homeSafeArea: { backgroundColor: '#BED0F7' },
+  homeSafeArea: { backgroundColor: '#F5F5F5' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
-  deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#BED0F7' },
-  deliveryBrandBlock: { marginLeft: 10 },
+  openingAnimationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, overflow: 'hidden', backgroundColor: '#F5F5F5' },
+  openingAnimationMessage: { position: 'absolute', left: 24, right: 24, top: '45%', zIndex: 2, color: palette.heading, fontSize: 23, lineHeight: 31, fontWeight: '800', textAlign: 'center' },
+  openingVehicle: { position: 'absolute' },
+  deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5' },
+  headerFlight: { position: 'absolute', left: 0, top: 9, opacity: 0.5 },
+  headerTruck: { position: 'absolute', left: 0, bottom: -7, opacity: 0.5 },
+  deliveryBrandBlock: { zIndex: 1, marginLeft: 10 },
   deliveryLogo: { width: 190, height: 40, marginLeft: -24, alignSelf: 'flex-start' },
-  addAddressButton: { marginTop: 4, marginLeft: -5, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  addAddressText: { color: palette.blue, fontSize: 12, fontWeight: '800' },
+  addAddressButton: { marginTop: 4, marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  addAddressText: { color: palette.blue, fontSize: 15, fontWeight: '800' },
   deliveryBrand: { color: palette.heading, fontSize: 18, fontWeight: '800' },
   deliveryTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
   deliveryTime: { color: palette.heading, fontSize: 31, lineHeight: 36, fontWeight: '900', letterSpacing: -1 },
   deliveryDistance: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, overflow: 'hidden', backgroundColor: '#DCE7FF', color: palette.blue, fontSize: 12, fontWeight: '800' },
   deliveryAddress: { marginTop: 2, color: palette.ink, fontSize: 13, fontWeight: '600' },
-  deliveryActions: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  deliveryActions: { zIndex: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
   wallet: { width: 47, height: 47, borderRadius: 24, backgroundColor: palette.white, justifyContent: 'center', alignItems: 'center' },
   walletText: { marginTop: -2, color: palette.ink, fontSize: 10, fontWeight: '800' },
   modalBackdrop: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.42)' },
@@ -442,40 +764,42 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', right: -7, top: -7, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: palette.blue, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: palette.white, fontSize: 10, fontWeight: '700' },
   content: { paddingHorizontal: 0, paddingBottom: 72 },
-  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#BED0F7' },
-  carouselFade: { marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#BED0F7' },
-  zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: '#BED0F7' },
+  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#F5F5F5' },
+  carouselFade: { marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#F5F5F5' },
+  zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: '#F5F5F5' },
   bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: '#F5F5F5' },
   zigzagTooth: { width: 16, height: 16, marginHorizontal: 1, marginTop: 6, backgroundColor: palette.white, transform: [{ rotate: '45deg' }] },
-  staticSearchZone: { paddingVertical: 10, backgroundColor: '#BED0F7' },
-  searchBox: { height: 40, marginHorizontal: 16, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
+  staticSearchZone: { paddingVertical: 10, backgroundColor: '#F5F5F5' },
+  searchBox: { height: 50, marginHorizontal: 16, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
   searchInput: { flex: 1, padding: 0, fontSize: 12, color: palette.ink },
-  blinkTabs: { gap: 12, paddingTop: 12, paddingHorizontal: 10, alignItems: 'flex-start', backgroundColor: '#BED0F7' },
-  blinkTab: { width: 78, height: 72, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 4, backgroundColor: 'transparent' },
-  blinkTabActive: { backgroundColor: 'transparent' },
-  blinkTabIndicator: { position: 'absolute', left: 5, right: 5, bottom: 0, height: 5, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.ink },
+  blinkTabs: { gap: 12, paddingTop: 12, paddingHorizontal: 10, alignItems: 'flex-start', backgroundColor: '#F5F5F5' },
+  blinkTab: { width: 78, height: 72, borderRadius: 10, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 7, backgroundColor: 'transparent' },
+  blinkTabActive: { backgroundColor: palette.blue },
+  blinkTabIndicator: { position: 'absolute', left: 10, right: 10, bottom: 0, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.white },
   blinkTabText: { marginTop: 6, color: palette.ink, fontSize: 11, lineHeight: 14, fontWeight: '500', textAlign: 'center' },
-  blinkTabTextActive: { color: palette.ink, fontWeight: '800' },
-  promoCards: { gap: 12, paddingBottom: 4 },
-  promoCard: { height: 270, borderRadius: 21, overflow: 'hidden', backgroundColor: '#DCE7FF' },
-  promoImage: { width: '100%', height: '100%' },
-  promoShade: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000', opacity: 0.18 },
+  blinkTabTextActive: { color: palette.white, fontWeight: '800' },
+  promoCards: { gap: 12, paddingVertical: 8 },
+  promoCard: { height: 270, borderRadius: 21, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 7, elevation: 4 },
+  promoImageFrame: { ...StyleSheet.absoluteFillObject, borderRadius: 21, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  promoImage: { width: '100%', height: '100%', transform: [{ scale: 1.28 }] },
   promoCopy: { position: 'absolute', left: 13, right: 10, bottom: 15 },
-  promoTitle: { color: palette.white, fontSize: 17, lineHeight: 20, fontWeight: '900' },
-  promoSubtitle: { color: palette.white, fontSize: 11, lineHeight: 14, marginTop: 4, width: 140 },
-  promoArrow: { position: 'absolute', right: 1, bottom: 1, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.40)' },
+  promoTitle: { color: '#1A1C1D', fontSize: 17, lineHeight: 20, fontWeight: '900' },
+  promoSubtitle: { color: '#1A1C1D', fontSize: 11, lineHeight: 14, marginTop: 4, width: 140 },
   blinkDivider: { marginTop: 15, marginHorizontal: 0, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EEF3FF' },
   blinkDividerText: { color: palette.blue, fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
-  trendingRow: { flexDirection: 'row', gap: 10 },
+  trendingProductRow: { gap: 12, paddingHorizontal: 2, paddingBottom: 5 },
   homeProductSections: { paddingHorizontal: 12 },
+  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5, rowGap: 14 },
+  shopCategoryItem: { width: '25%', paddingHorizontal: 5, alignItems: 'center' },
+  shopCategoryImageBlock: { width: '100%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 3 },
+  shopCategoryImage: { width: '86%', height: '86%' },
+  shopCategoryLabel: { minHeight: 30, marginTop: 7, color: palette.heading, fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
   exploreCard: { width: 130, height: 180, borderRadius: 12, overflow: 'hidden', backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border },
   trendingCard: { flex: 1, width: undefined },
   exploreImage: { width: '84%', alignSelf: 'center', height: 112, marginTop: 10, backgroundColor: palette.white },
   exploreHeart: { position: 'absolute', top: 10, right: 10 },
   exploreName: { marginTop: 13, paddingHorizontal: 10, color: palette.heading, fontSize: 11, lineHeight: 14, fontWeight: '700' },
-  seeMoreButton: { alignSelf: 'center', height: 35, marginTop: 5, paddingHorizontal: 17, borderWidth: 1, borderColor: palette.blue, borderRadius: 18, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  seeMoreText: { color: palette.blue, fontSize: 11, fontWeight: '800' },
   shopifyStatus: { minHeight: 42, marginTop: 12, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8 },
   shopifyConnected: { backgroundColor: '#E9F7EE' },
   shopifyError: { backgroundColor: '#FCEDED' },
@@ -490,8 +814,26 @@ const styles = StyleSheet.create({
   dots: { height: 21, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#B33C52' },
   dotActive: { width: 4, backgroundColor: palette.blue },
-  sectionTitle: { color: palette.heading, fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 12, marginBottom: 10 },
+  sectionTitle: { color: palette.heading, fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   productCard: { marginBottom: 15 },
+  collectionProductCard: { marginBottom: 0 },
+  collectionProductVisual: { width: '100%', aspectRatio: 0.92, borderWidth: 1, borderColor: '#E7E7E7', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  collectionProductImage: { width: '94%', height: '94%' },
+  collectionUnavailable: { opacity: 0.45 },
+  collectionDiscountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
+  collectionDiscountText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  collectionComingSoon: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
+  collectionComingSoonText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  collectionHeart: { position: 'absolute', top: 7, right: 7 },
+  collectionImageAction: { position: 'absolute', right: 0, bottom: -19, minWidth: 62, height: 38, paddingHorizontal: 10, borderWidth: 1.5, borderColor: palette.blue, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  collectionImageActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  collectionNotifyAction: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
+  collectionNotifyText: { color: '#2E8B36' },
+  collectionProductName: { minHeight: 34, marginTop: 25, color: palette.ink, fontSize: 11, lineHeight: 15, fontWeight: '700' },
+  collectionPriceRow: { height: 46, marginTop: 3, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start', alignItems: 'baseline', columnGap: 4, rowGap: 2, overflow: 'hidden' },
+  collectionPrice: { color: palette.heading, fontSize: 16, fontWeight: '900' },
+  collectionSalePrice: { color: '#D83434' },
+  collectionOldPrice: { flexShrink: 1, color: '#666666', fontSize: 10, textDecorationLine: 'line-through' },
   productRow: { gap: 5 },
   productVisual: { height: 109, borderRadius: 6, backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border, justifyContent: 'center', alignItems: 'center' },
   productImage: { width: '80%', height: '88%' },
@@ -536,49 +878,64 @@ const styles = StyleSheet.create({
   collectionBrand: { flex: 1, height: 37, borderRadius: 5, borderWidth: 1, borderColor: '#D7D7D7', alignItems: 'center', justifyContent: 'center' },
   collectionBrandText: { fontSize: 15, fontWeight: '500', color: '#111' },
   jbl: { color: '#E52C22', fontWeight: '900' },
-  floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 61, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderTopWidth: 1, borderColor: palette.border },
-  footerTab: { flex: 1, height: 57, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  footerTabText: { fontSize: 8, color: '#555', fontWeight: '500' },
+  floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 70, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderTopWidth: 1, borderColor: palette.border },
+  footerTab: { flex: 1, height: 66, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  footerTabText: { fontSize: 10, color: '#555', fontWeight: '500' },
   footerTabActive: { color: palette.blue, fontWeight: '700' },
-  detailPage: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
-  detailHeader: { height: 80, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
-  detailHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 22 },
+  detailPage: { flex: 1, alignSelf: 'center', backgroundColor: '#F4F5FA' },
   detailContent: { paddingBottom: 112 },
-  detailHero: { width: '100%', height: 458 },
-  detailDots: { height: 34, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 3, borderTopWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
+  detailHeroSection: { height: 310, backgroundColor: '#FFFFFF' },
+  detailGallery: { width: '100%', backgroundColor: '#FFFFFF' },
+  detailHero: { width: '100%', height: '100%' },
+  detailOverlayHeader: { position: 'absolute', top: 14, left: 14, right: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailOverlayActions: { flexDirection: 'row', gap: 9 },
+  detailCircleButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.94)', shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
+  detailDots: { position: 'absolute', left: 0, right: 0, bottom: 10, height: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 },
   detailDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(43,84,123,0.48)' },
   detailDotActive: { backgroundColor: '#CC3438' },
-  selectedColor: { marginHorizontal: 16, fontSize: 16, lineHeight: 22 },
-  selectedColorBold: { fontWeight: '700' },
-  swatches: { flexDirection: 'row', gap: 14, paddingHorizontal: 16, marginTop: 15 },
-  swatch: { flex: 1, height: 87, borderWidth: 1, borderColor: palette.border, borderRadius: 6, overflow: 'hidden' },
-  swatchActive: { borderColor: palette.blue, borderWidth: 1.5 },
+  detailThumbnailScroller: { width: '100%', flexGrow: 0, backgroundColor: '#FFFFFF' },
+  detailThumbnails: { minWidth: '100%', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
+  detailThumbnail: { width: 54, height: 54, borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 9, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  detailThumbnailActive: { borderWidth: 2, borderColor: palette.blue },
   swatchImage: { width: '100%', height: '100%' },
-  detailTitle: { marginHorizontal: 16, marginTop: 17, width: 350, fontSize: 22, lineHeight: 27, fontWeight: '800' },
-  detailPriceRow: { marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
-  detailPrice: { fontSize: 24, fontWeight: '800' },
-  detailOldPrice: { fontSize: 18, color: 'rgba(0,0,0,0.45)', textDecorationLine: 'line-through' },
-  detailDiscount: { fontSize: 18, color: palette.green },
-  inclusive: { marginHorizontal: 16, fontSize: 14, color: 'rgba(0,0,0,0.7)', marginTop: 5 },
-  offers: { marginTop: 22, paddingVertical: 11, backgroundColor: 'rgba(191,228,191,0.31)' },
-  offerTitle: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 8 },
-  offerTitleText: { flex: 1, fontSize: 16, fontWeight: '600' },
-  offerRow: { gap: 12, paddingHorizontal: 8, marginTop: 13 },
-  offerCard: { width: 201, minHeight: 50, padding: 10, borderRadius: 4, backgroundColor: '#EBF7EB', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2 },
-  offerText: { fontSize: 12, lineHeight: 15 },
-  detailSectionTitle: { marginHorizontal: 16, marginTop: 17, marginBottom: 9, fontSize: 18, fontWeight: '600' },
-  deliveryBox: { height: 45, marginHorizontal: 16, marginBottom: 7, borderRadius: 5, backgroundColor: 'rgba(43,87,126,0.15)', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, gap: 10 },
-  pin: { fontSize: 13, fontWeight: '800' },
-  deliveryLink: { flex: 1, color: '#0088FF', fontSize: 13, fontWeight: '600' },
-  deliveryText: { fontSize: 16, fontWeight: '800' },
-  accordion: { minHeight: 94, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border, paddingHorizontal: 16, paddingVertical: 17 },
+  detailInfoCard: { marginHorizontal: 12, marginTop: 8, padding: 13, borderRadius: 14, backgroundColor: '#FFFFFF' },
+  detailTitle: { color: palette.heading, fontSize: 18, lineHeight: 23, fontWeight: '900' },
+  detailUnit: { marginTop: 5, color: palette.ink, fontSize: 12, fontWeight: '700' },
+  detailPriceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 7, marginTop: 7 },
+  detailPrice: { fontSize: 22, fontWeight: '900' },
+  detailOldPrice: { fontSize: 14, color: 'rgba(0,0,0,0.45)', textDecorationLine: 'line-through' },
+  detailDiscount: { fontSize: 14, color: '#D83434', fontWeight: '800' },
+  inclusive: { color: '#536071', fontSize: 12, marginTop: 5 },
+  detailBrand: { color: palette.heading, fontSize: 16, fontWeight: '900' },
+  detailMuted: { marginTop: 4, color: '#667085', fontSize: 12 },
+  detailStockRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stockDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#2E8B36' },
+  stockDotUnavailable: { backgroundColor: '#B98725' },
+  stockText: { color: '#2E8B36', fontSize: 13, fontWeight: '800' },
+  stockTextUnavailable: { color: '#B98725' },
+  quantityRow: { marginTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  quantityLabel: { color: palette.heading, fontSize: 14, fontWeight: '800' },
+  quantityControl: { width: 116, height: 40, borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  quantityButton: { paddingHorizontal: 10, color: palette.ink, fontSize: 22 },
+  quantityValue: { color: palette.heading, fontSize: 14, fontWeight: '800' },
+  genuineText: { marginTop: 18, color: '#268767', fontSize: 11, letterSpacing: 1.2, fontWeight: '900' },
+  deliveryEstimate: { marginTop: 14, color: palette.heading, fontSize: 15, fontWeight: '900' },
+  codBox: { height: 48, marginTop: 12, borderWidth: 1.5, borderColor: '#2E8B36', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  codText: { color: '#22812E', fontSize: 14, fontWeight: '900' },
+  buyNowButton: { height: 48, marginTop: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2D2E' },
+  buyNowButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  accordion: { minHeight: 62, marginHorizontal: 12, marginTop: 10, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 18, backgroundColor: '#FFFFFF' },
   accordionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  accordionTitle: { fontSize: 18, fontWeight: '600' },
-  accordionCopy: { fontSize: 14, color: 'rgba(0,0,0,0.54)', marginTop: 9, lineHeight: 19, paddingRight: 30 },
-  similarTitle: { marginHorizontal: 16, marginTop: 28, marginBottom: 16, fontSize: 18, fontWeight: '800' },
-  buyBar: { height: 91, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.white, borderTopWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
-  addLarge: { width: '46%', height: 56, borderRadius: 8, borderWidth: 1, borderColor: palette.blue, alignItems: 'center', justifyContent: 'center' },
-  addLargeText: { fontSize: 18, fontWeight: '800' },
-  buyLarge: { width: '46%', height: 56, borderRadius: 8, backgroundColor: palette.blue, alignItems: 'center', justifyContent: 'center' },
-  buyLargeText: { color: palette.white, fontSize: 18, fontWeight: '800' },
+  accordionTitle: { fontSize: 15, fontWeight: '800' },
+  accordionCopy: { fontSize: 13, color: '#4D5562', marginTop: 12, lineHeight: 20 },
+  similarTitle: { marginHorizontal: 14, marginTop: 24, fontSize: 20, fontWeight: '900' },
+  similarSubtitle: { marginHorizontal: 14, marginTop: 4, color: '#667085', fontSize: 12 },
+  detailRecommendations: { gap: 12, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 18 },
+  buyBar: { minHeight: 94, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.white, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#E5E5E5' },
+  buyBarUnit: { color: '#4D5562', fontSize: 11, fontWeight: '700' },
+  buyBarPrice: { marginTop: 2, color: palette.heading, fontSize: 19, fontWeight: '900' },
+  buyBarTax: { marginTop: 2, color: '#667085', fontSize: 10 },
+  addLarge: { width: '56%', height: 56, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  notifyLarge: { backgroundColor: '#2E8B36' },
+  addLargeText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
 });
