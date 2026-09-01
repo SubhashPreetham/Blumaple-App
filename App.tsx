@@ -273,7 +273,7 @@ function Storefront() {
           <Text style={styles.collectionHeaderTitle}>AUDIO</Text>
           <View style={styles.collectionHeaderActions}><Ionicons name="search-outline" size={20} color={palette.blue} /><Ionicons name="cart-outline" size={22} color={palette.blue} /></View>
         </View> : <View style={styles.deliveryHeader}>
-          <View>
+          <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple logo.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={16} color={palette.blue} /><Text style={styles.addAddressText}>Check Delivery</Text></Pressable>
           </View>
@@ -285,18 +285,22 @@ function Storefront() {
           </View>
         </View>}
 
+        {screen === 'home' && <View style={styles.staticSearchZone}>
+          <View style={styles.searchBox}>
+            <Ionicons name="search-outline" size={20} color={palette.ink} />
+            <TextInput placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
+          </View>
+        </View>}
+
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           {screen === 'home' ? <>
           <View style={styles.carouselHeaderZone}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={28} color={palette.ink} />
-            <TextInput placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
-          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.blinkTabs}>
             {homeMenus.map((menu) => (
               <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, activeCategory === menu.label && styles.blinkTabActive]}>
-                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={27} color={activeCategory === menu.label ? palette.white : palette.ink} />
+                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={29} color={palette.ink} />
                 <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
+                {activeCategory === menu.label && <View style={styles.blinkTabIndicator} />}
               </Pressable>
             ))}
           </ScrollView>
@@ -325,6 +329,7 @@ function Storefront() {
           </View>
           </View>
           <View style={styles.zigzagPartition}>{Array.from({ length: 30 }).map((_, index) => <View key={index} style={styles.zigzagTooth} />)}</View>
+          <View style={styles.homeProductSections}>
           <SectionTitle>Trending in {activeHomeMenu.label}</SectionTitle>
           <View style={styles.trendingRow}>
             {categoryProducts.slice(0, 3).map(item => <Pressable key={`explore-${activeHomeMenu.label}-${item.id}`} style={[styles.exploreCard, styles.trendingCard]} onPress={() => { setSelectedProduct(item); setScreen('product'); }}><Image source={item.image} style={styles.exploreImage} resizeMode="contain" /><Ionicons name="heart" size={16} color={palette.white} style={styles.exploreHeart} /><Text numberOfLines={1} style={styles.exploreName}>{item.name}</Text></Pressable>)}
@@ -332,6 +337,7 @@ function Storefront() {
           <Pressable onPress={() => setScreen('collection')} style={styles.seeMoreButton}><Text style={styles.seeMoreText}>See more products</Text><Ionicons name="arrow-forward" size={15} color={palette.blue} /></Pressable>
           <SectionTitle>Best selling {activeHomeMenu.label}</SectionTitle>
           <View style={styles.grid}>{categoryProducts.slice(0, 4).map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={cardWidth} favorite={favorites.has(item.id)} showFavorite={false} onFavorite={() => toggleFavorite(item.id)} onAdd={() => addToCart(item)} onOpen={() => { setSelectedProduct(item); setScreen('product'); }} />)}</View>
+          </View>
 
           </> : <>
             <View style={styles.audioHubHeading}>
@@ -408,8 +414,9 @@ const styles = StyleSheet.create({
   homeSafeArea: { backgroundColor: '#BED0F7' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
   deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#BED0F7' },
+  deliveryBrandBlock: { marginLeft: 10 },
   deliveryLogo: { width: 190, height: 40, marginLeft: -24, alignSelf: 'flex-start' },
-  addAddressButton: { marginTop: 4, marginLeft: -5, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addAddressButton: { marginTop: 4, marginLeft: -5, flexDirection: 'row', alignItems: 'center', gap: 2 },
   addAddressText: { color: palette.blue, fontSize: 12, fontWeight: '800' },
   deliveryBrand: { color: palette.heading, fontSize: 18, fontWeight: '800' },
   deliveryTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
@@ -434,19 +441,21 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   badge: { position: 'absolute', right: -7, top: -7, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: palette.blue, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: palette.white, fontSize: 10, fontWeight: '700' },
-  content: { paddingHorizontal: 10, paddingBottom: 72 },
-  carouselHeaderZone: { marginHorizontal: -10, paddingHorizontal: 10, backgroundColor: '#BED0F7' },
-  carouselFade: { marginTop: 18, marginHorizontal: -10, paddingHorizontal: 10, backgroundColor: '#BED0F7' },
-  zigzagPartition: { height: 14, marginHorizontal: -10, flexDirection: 'row', overflow: 'hidden', backgroundColor: '#BED0F7' },
+  content: { paddingHorizontal: 0, paddingBottom: 72 },
+  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#BED0F7' },
+  carouselFade: { marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: '#BED0F7' },
+  zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: '#BED0F7' },
   bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: '#F5F5F5' },
   zigzagTooth: { width: 16, height: 16, marginHorizontal: 1, marginTop: 6, backgroundColor: palette.white, transform: [{ rotate: '45deg' }] },
-  searchBox: { height: 52, marginTop: 10, borderWidth: 1, borderColor: palette.border, borderRadius: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: palette.white },
-  searchInput: { flex: 1, padding: 0, fontSize: 13, color: palette.ink },
-  blinkTabs: { gap: 7, paddingTop: 15, paddingHorizontal: 9, alignItems: 'flex-end', backgroundColor: '#BED0F7' },
-  blinkTab: { width: 90, height: 66, borderTopLeftRadius: 27, borderTopRightRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: '#F5F5F5' },
-  blinkTabActive: { width: 108, height: 86, borderTopLeftRadius: 31, borderTopRightRadius: 31, backgroundColor: palette.blue, borderColor: palette.blue, borderBottomWidth: 0, marginBottom: -1 },
-  blinkTabText: { marginTop: 5, color: palette.ink, fontSize: 11, fontWeight: '600', textAlign: 'center' },
-  blinkTabTextActive: { color: palette.white, fontWeight: '800' },
+  staticSearchZone: { paddingVertical: 10, backgroundColor: '#BED0F7' },
+  searchBox: { height: 40, marginHorizontal: 16, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
+  searchInput: { flex: 1, padding: 0, fontSize: 12, color: palette.ink },
+  blinkTabs: { gap: 12, paddingTop: 12, paddingHorizontal: 10, alignItems: 'flex-start', backgroundColor: '#BED0F7' },
+  blinkTab: { width: 78, height: 72, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 4, backgroundColor: 'transparent' },
+  blinkTabActive: { backgroundColor: 'transparent' },
+  blinkTabIndicator: { position: 'absolute', left: 5, right: 5, bottom: 0, height: 5, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.ink },
+  blinkTabText: { marginTop: 6, color: palette.ink, fontSize: 11, lineHeight: 14, fontWeight: '500', textAlign: 'center' },
+  blinkTabTextActive: { color: palette.ink, fontWeight: '800' },
   promoCards: { gap: 12, paddingBottom: 4 },
   promoCard: { height: 270, borderRadius: 21, overflow: 'hidden', backgroundColor: '#DCE7FF' },
   promoImage: { width: '100%', height: '100%' },
@@ -455,10 +464,11 @@ const styles = StyleSheet.create({
   promoTitle: { color: palette.white, fontSize: 17, lineHeight: 20, fontWeight: '900' },
   promoSubtitle: { color: palette.white, fontSize: 11, lineHeight: 14, marginTop: 4, width: 140 },
   promoArrow: { position: 'absolute', right: 1, bottom: 1, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.40)' },
-  blinkDivider: { marginTop: 15, marginHorizontal: -10, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EEF3FF' },
+  blinkDivider: { marginTop: 15, marginHorizontal: 0, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EEF3FF' },
   blinkDividerText: { color: palette.blue, fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
   trendingRow: { flexDirection: 'row', gap: 10 },
+  homeProductSections: { paddingHorizontal: 12 },
   exploreCard: { width: 130, height: 180, borderRadius: 12, overflow: 'hidden', backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border },
   trendingCard: { flex: 1, width: undefined },
   exploreImage: { width: '84%', alignSelf: 'center', height: 112, marginTop: 10, backgroundColor: palette.white },
