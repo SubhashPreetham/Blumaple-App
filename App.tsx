@@ -23,6 +23,7 @@ import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-
 import { fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AddressPage } from './pages/AddressPage';
+import { OrderResultPage } from './pages/OrderResultPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { CategoryCollectionPage } from './pages/CategoryCollectionPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -61,6 +62,7 @@ type Product = {
 };
 
 type CartItem = { product: Product; quantity: number };
+type OrderOutcome = { success: boolean; orderId?: string; items: CartItem[]; paymentMethod: 'online' | 'cod'; total: number; tax: number; codFee: number };
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
@@ -344,8 +346,9 @@ function CartPage({ items, onBack, onChangeQuantity, onCheckout }: { items: Cart
     <View style={styles.cartPageHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.cartBackButton}><Ionicons name="arrow-back" size={23} color={palette.ink} /></Pressable><Text style={styles.cartPageTitle}>My Cart</Text></View>
     {items.length ? <ScrollView contentContainerStyle={styles.cartList} showsVerticalScrollIndicator={false}>{items.map(({ product, quantity }) => <View key={product.id} style={styles.cartListItem}>
       <Image source={product.image} style={styles.cartListImage} resizeMode="contain" />
-      <View style={styles.cartListCopy}><Text numberOfLines={2} style={styles.cartListName}>{product.name}</Text><Text style={styles.cartListPrice}>{product.price}</Text><Pressable onPress={() => onChangeQuantity(product.id, -quantity)}><Text style={styles.cartRemoveText}>Remove</Text></Pressable></View>
-      <View style={styles.cartListActions}><View style={styles.cartQuantityControl}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, -1)}><Text style={styles.cartQuantityButton}>−</Text></Pressable><Text style={styles.cartQuantityValue}>{quantity}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, 1)}><Text style={styles.cartQuantityButton}>+</Text></Pressable></View><Text style={styles.cartLineTotal}>{product.unitPrice ? money(String(product.unitPrice * quantity), product.currencyCode ?? 'INR') : product.price}</Text></View>
+      <View style={styles.cartListCopy}><Text numberOfLines={3} style={styles.cartListName}>{product.name}</Text><Text style={styles.cartListPrice}>{product.price}</Text></View>
+      <View style={styles.cartListActions}><View style={styles.cartQuantityControl}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, -1)}><Text style={styles.cartQuantityButton}>−</Text></Pressable><Text style={styles.cartQuantityValue}>{quantity}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, 1)}><Text style={styles.cartQuantityButton}>+</Text></Pressable></View></View>
+      <Text numberOfLines={1} style={styles.cartLineTotal}>{product.unitPrice ? money(String(product.unitPrice * quantity), product.currencyCode ?? 'INR') : product.price}</Text>
     </View>)}</ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
     {items.length ? <View style={styles.cartCheckoutBar}><View style={styles.cartTotalBlock}><Text style={styles.cartItemCount}>{itemCount} {itemCount === 1 ? 'item' : 'items'} in cart</Text><Text style={styles.cartTotalText}>Total: {cartTotalText}</Text></View><Pressable onPress={onCheckout} style={styles.cartCheckoutButton}><Text style={styles.cartCheckoutText}>Proceed to checkout</Text></Pressable></View> : null}
   </View>;
@@ -365,7 +368,7 @@ function Storefront() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartPopupVisible, setCartPopupVisible] = useState(false);
   const [cartPreview, setCartPreview] = useState<Product | null>(null);
-  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'product' | 'cart' | 'checkout' | 'address'>('home');
+  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
   const [shopifyProducts, setShopifyProducts] = useState<Product[]>([]);
   const [shopifyMenuItems, setShopifyMenuItems] = useState<ShopifyMenuItem[]>([]);
   const [shopifyCollectionPreviews, setShopifyCollectionPreviews] = useState<Record<string, ShopifyCollectionPreview>>({});
@@ -382,6 +385,7 @@ function Storefront() {
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [shopifyError, setShopifyError] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [orderOutcome, setOrderOutcome] = useState<OrderOutcome | null>(null);
   const [pincodeModalVisible, setPincodeModalVisible] = useState(false);
   const [pincode, setPincode] = useState('');
   const [uploadedCarousels, setUploadedCarousels] = useState<UploadedCarouselData>({});
@@ -674,17 +678,19 @@ function Storefront() {
       onAdd={product => addToCart(mapShopifyProduct(product))}
       onOpenProduct={product => openProduct(mapShopifyProduct(product), selectedCollectionItem.resource?.id)}
     />
-    {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} containerStyle={styles.collectionCartPopupLayer} /> : null}
+    {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} containerStyle={[styles.collectionCartPopupLayer, { paddingBottom: Math.max(insets.bottom + 10, 38) }]} /> : null}
   </SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations.some(item => item.id === selectedProduct.id) ? productPageRecommendations : products;
-    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} onBack={() => setScreen('home')} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setScreen('checkout'); }} onOpenProduct={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} /> : null}</SafeAreaView>;
+    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} onBack={() => setScreen('home')} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setScreen('address'); }} onOpenProduct={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} /> : null}</SafeAreaView>;
   }
 
-  if (screen === 'cart') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><CartPage items={cartItems} onBack={() => setScreen('home')} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setScreen('checkout'); } }} /></SafeAreaView>;
+  if (screen === 'cart') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><CartPage items={cartItems} onBack={() => setScreen('home')} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setScreen('address'); } }} /></SafeAreaView>;
 
-  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} address={shippingAddress} onBack={() => setScreen('product')} onAddress={() => setScreen('address')} /></SafeAreaView>;
+  if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
+
+  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} onBack={() => setScreen('product')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></SafeAreaView>;
 
   if (screen === 'address') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><AddressPage onBack={() => setScreen('checkout')} onSave={(address) => { setShippingAddress(address); setScreen('checkout'); }} /></SafeAreaView>;
 
@@ -1072,7 +1078,7 @@ const styles = StyleSheet.create({
   jbl: { color: '#E52C22', fontWeight: '900' },
   floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 70, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderTopWidth: 1, borderColor: palette.border },
   cartPopupLayer: { ...StyleSheet.absoluteFillObject, zIndex: 50, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 82 },
-  collectionCartPopupLayer: { paddingBottom: 18 },
+  collectionCartPopupLayer: {},
   cartPopup: { width: 174, height: 58, paddingHorizontal: 8, borderRadius: 13, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.blue, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 7 },
   cartPopupImage: { width: 38, height: 38, borderRadius: 5, backgroundColor: '#FFFFFF' },
   cartPopupCopy: { flex: 1, marginLeft: 8 },
@@ -1082,27 +1088,26 @@ const styles = StyleSheet.create({
   cartPageHeader: { height: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: '#FFFFFF', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#E4E4E4' },
   cartBackButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F5F5' },
   cartPageTitle: { color: palette.heading, fontSize: 21, fontWeight: '900' },
-  cartList: { padding: 12, gap: 12, paddingBottom: 92 },
-  cartListItem: { minHeight: 88, padding: 8, borderRadius: 12, flexDirection: 'row', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 5, elevation: 2 },
-  cartListImage: { width: 62, height: 72, borderRadius: 7, backgroundColor: '#FFFFFF' },
-  cartListCopy: { flex: 1, marginLeft: 10, paddingTop: 1 },
-  cartListName: { color: palette.heading, fontSize: 13, lineHeight: 16, fontWeight: '800' },
-  cartListPrice: { marginTop: 4, color: '#D83434', fontSize: 14, fontWeight: '900' },
-  cartRemoveText: { marginTop: 4, color: '#697386', fontSize: 10, fontWeight: '700' },
-  cartListActions: { width: 88, alignItems: 'flex-end', justifyContent: 'space-between', paddingVertical: 1 },
-  cartQuantityControl: { width: 86, height: 39, borderRadius: 9, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2E8B36' },
-  cartQuantityButton: { color: '#FFFFFF', fontSize: 23, lineHeight: 27, fontWeight: '600' },
-  cartQuantityValue: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  cartLineTotal: { color: palette.heading, fontSize: 14, fontWeight: '900' },
+  cartList: { padding: 12, gap: 12, paddingBottom: 112 },
+  cartListItem: { minHeight: 116, padding: 9, borderRadius: 12, flexDirection: 'row', position: 'relative', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 5, elevation: 2 },
+  cartListImage: { width: 76, height: 98, borderRadius: 8, backgroundColor: '#FFFFFF' },
+  cartListCopy: { flex: 1, marginLeft: 10, paddingVertical: 2 },
+  cartListName: { color: palette.heading, fontSize: 14, lineHeight: 18, fontWeight: '800' },
+  cartListPrice: { marginTop: 1, color: '#D83434', fontSize: 15, lineHeight: 19, fontWeight: '900' },
+  cartListActions: { width: 82, alignItems: 'flex-end', paddingVertical: 2 },
+  cartQuantityControl: { width: 74, height: 32, borderRadius: 8, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2E8B36' },
+  cartQuantityButton: { color: '#FFFFFF', fontSize: 18, lineHeight: 21, fontWeight: '600' },
+  cartQuantityValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  cartLineTotal: { position: 'absolute', right: 9, bottom: 9, color: palette.heading, fontSize: 18, lineHeight: 22, fontWeight: '900' },
   emptyCart: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyCartTitle: { marginTop: 14, color: palette.heading, fontSize: 19, fontWeight: '900' },
   emptyCartCopy: { marginTop: 6, color: '#697386', fontSize: 13 },
-  cartCheckoutBar: { padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#E4E4E4', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF' },
+  cartCheckoutBar: { minHeight: 88, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#E4E4E4', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF' },
   cartTotalBlock: { flex: 1 },
   cartItemCount: { color: '#697386', fontSize: 11, fontWeight: '700' },
   cartTotalText: { marginTop: 2, color: palette.heading, fontSize: 15, fontWeight: '900' },
-  cartCheckoutButton: { height: 46, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
-  cartCheckoutText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  cartCheckoutButton: { height: 56, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  cartCheckoutText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   footerTab: { flex: 1, height: 66, alignItems: 'center', justifyContent: 'center', gap: 4 },
   footerTabText: { fontSize: 10, color: '#555', fontWeight: '500' },
   footerTabActive: { color: palette.blue, fontWeight: '700' },
