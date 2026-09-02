@@ -4,8 +4,9 @@ export type ShopifyProduct = {
   title: string;
   vendor: string;
   brandName: { value: string } | null;
+  techSpec: { value: string } | null;
   tags: string[];
-  collections: { nodes: Array<{ handle: string; title: string }> };
+  collections: { nodes: Array<{ id: string; handle: string; title: string }> };
   description: string;
   images: { nodes: Array<{ url: string; altText: string | null }> };
   variants: {
@@ -33,6 +34,7 @@ export type ShopifyCollectionPreview = {
   id: string;
   handle: string;
   title: string;
+  image: { url: string; altText: string | null } | null;
   products: { nodes: ShopifyProduct[] };
 };
 
@@ -75,7 +77,8 @@ const PRODUCTS_QUERY = `#graphql
         handle
         title vendor tags
         brandName: metafield(namespace: "custom", key: "brand_name") { value }
-        collections(first: 20) { nodes { handle title } }
+        techSpec: metafield(namespace: "custom", key: "tech_spec") { value }
+        collections(first: 20) { nodes { id handle title } }
         description
         images(first: 4) { nodes { url altText } }
         variants(first: 1) {
@@ -110,11 +113,13 @@ const COLLECTION_PREVIEWS_QUERY = `#graphql
     nodes(ids: $ids) {
       ... on Collection {
         id handle title
+        image { url(transform: { maxWidth: 720, maxHeight: 720 }) altText }
         products(first: 1) {
           nodes {
             id handle title vendor tags description
             brandName: metafield(namespace: "custom", key: "brand_name") { value }
-            collections(first: 20) { nodes { handle title } }
+            techSpec: metafield(namespace: "custom", key: "tech_spec") { value }
+            collections(first: 20) { nodes { id handle title } }
             images(first: 4) { nodes { url(transform: { maxWidth: 480, maxHeight: 480 }) altText } }
             variants(first: 1) {
               nodes { id title availableForSale sku price { amount currencyCode } compareAtPrice { amount currencyCode } }
@@ -136,7 +141,8 @@ const COLLECTION_PRODUCTS_QUERY = `#graphql
           nodes {
             id handle title vendor tags description
             brandName: metafield(namespace: "custom", key: "brand_name") { value }
-            collections(first: 20) { nodes { handle title } }
+            techSpec: metafield(namespace: "custom", key: "tech_spec") { value }
+            collections(first: 20) { nodes { id handle title } }
             images(first: 4) { nodes { url(transform: { maxWidth: 720, maxHeight: 720 }) altText } }
             variants(first: 1) {
               nodes { id title availableForSale sku price { amount currencyCode } compareAtPrice { amount currencyCode } }

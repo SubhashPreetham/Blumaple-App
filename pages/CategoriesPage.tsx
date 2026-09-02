@@ -29,10 +29,10 @@ export function CategoriesPage({ menuItems, previews, onSelectCollection }: Prop
         <View style={s.collectionGrid}>
           {collections.map(collection => {
             const preview = collection.resource ? previews[collection.resource.id] : undefined;
-              const imageUrl = preview?.products.nodes[0]?.images.nodes[0]?.url;
+              const imageUrl = preview?.image?.url ?? preview?.products.nodes[0]?.images.nodes[0]?.url;
             return <Pressable key={collection.id} onPress={() => onSelectCollection(category, collection)} style={s.collectionItem}>
               <View style={s.imageBlock}>
-                <CollectionImage imageUrl={imageUrl} loaded={Boolean(preview)} />
+                <View style={s.imageClip}><CollectionImage imageUrl={imageUrl} loaded={Boolean(preview)} /></View>
               </View>
               <Text numberOfLines={2} style={s.collectionLabel}>{collection.title.trim()}</Text>
             </Pressable>;
@@ -44,12 +44,13 @@ export function CategoriesPage({ menuItems, previews, onSelectCollection }: Prop
 }
 
 const s = StyleSheet.create({
-  page: { paddingTop: 18, paddingHorizontal: 12, paddingBottom: 92, backgroundColor: '#FFFFFF' },
+  page: { paddingTop: 18, paddingHorizontal: 12, paddingBottom: 12, backgroundColor: '#FFFFFF' },
   categorySection: { marginBottom: 28 },
   categoryTitle: { marginBottom: 11, color: '#1A1C1D', fontSize: 17, lineHeight: 22, fontWeight: '800' },
   collectionGrid: { marginHorizontal: -5, flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   collectionItem: { width: '25%', paddingHorizontal: 5, alignItems: 'center' },
   imageBlock: { width: '100%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 3 },
-  image: { width: '92%', height: '92%' },
+  imageClip: { width: '100%', height: '100%', borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  image: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
   collectionLabel: { minHeight: 34, marginTop: 7, color: '#1A1C1D', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
 });

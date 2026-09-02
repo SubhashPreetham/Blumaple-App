@@ -15,7 +15,7 @@ type Props = {
   onBack: () => void;
   onSelectCollection: (collection: ShopifyMenuItem) => void;
   onLoadMore: () => void;
-  onAdd: () => void;
+  onAdd: (product: ShopifyProduct) => void;
   onOpenProduct: (product: ShopifyProduct) => void;
 };
 
@@ -82,10 +82,10 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
         {collections.map(collection => {
           const active = collection.id === selectedCollection.id;
           const preview = collection.resource ? previews[collection.resource.id] : undefined;
-          const imageUrl = preview?.products.nodes[0]?.images.nodes[0]?.url;
+          const imageUrl = preview?.image?.url ?? preview?.products.nodes[0]?.images.nodes[0]?.url;
           return <Pressable key={collection.id} onPress={() => onSelectCollection(collection)} style={[s.collectionRailItem, active && s.collectionRailItemActive]}>
             <View style={[s.collectionImageBlock, active && s.collectionImageBlockActive]}>
-              {imageUrl ? <Image source={{ uri: imageUrl }} style={s.collectionImage} resizeMode="contain" /> : <Ionicons name="image-outline" size={25} color="#8D9AAF" />}
+              <View style={s.collectionImageClip}>{imageUrl ? <Image source={{ uri: imageUrl }} style={s.collectionImage} resizeMode="contain" /> : <Ionicons name="image-outline" size={25} color="#8D9AAF" />}</View>
             </View>
             <Text numberOfLines={3} style={[s.collectionName, active && s.collectionNameActive]}>{collection.title.trim()}</Text>
           </Pressable>;
@@ -113,7 +113,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                   {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
                   {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>-{discountPercent}%</Text></View> : null}
                   <Ionicons name="heart-outline" size={20} color="#3F72E5" style={s.heart} />
-                  <Pressable onPress={availableForSale ? onAdd : () => {}} style={[s.imageActionButton, !availableForSale && s.notifyButton]}><Text style={[s.imageActionText, !availableForSale && s.notifyButtonText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
+                <Pressable onPress={availableForSale ? () => onAdd(product) : () => {}} style={[s.imageActionButton, !availableForSale && s.notifyButton]}><Text style={[s.imageActionText, !availableForSale && s.notifyButtonText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
                 </Pressable>
                 <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}>
@@ -188,7 +188,8 @@ const s = StyleSheet.create({
   collectionRailItemActive: { borderColor: '#285FCB', backgroundColor: '#3F72E5' },
   collectionImageBlock: { width: 62, height: 62, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 4, elevation: 3 },
   collectionImageBlockActive: { backgroundColor: '#FFFFFF' },
-  collectionImage: { width: '88%', height: '88%' },
+  collectionImageClip: { width: '100%', height: '100%', borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  collectionImage: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
   collectionName: { marginTop: 6, color: '#555555', fontSize: 10, lineHeight: 13, textAlign: 'center', fontWeight: '600' },
   collectionNameActive: { color: '#FFFFFF', fontWeight: '900' },
   productsPanel: { flex: 1, backgroundColor: '#FFFFFF' },
