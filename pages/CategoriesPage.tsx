@@ -46,11 +46,11 @@ export function CategoriesPage({ menuItems, previews, onSelectCollection }: Prop
 const s = StyleSheet.create({
   page: { paddingTop: 18, paddingHorizontal: 12, paddingBottom: 12, backgroundColor: '#FFFFFF' },
   categorySection: { marginBottom: 28 },
-  categoryTitle: { marginBottom: 11, color: '#1A1C1D', fontSize: 17, lineHeight: 22, fontWeight: '800' },
+  categoryTitle: { marginBottom: 11, color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 17, lineHeight: 22, fontWeight: '800' },
   collectionGrid: { marginHorizontal: -5, flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
-  collectionItem: { width: '25%', paddingHorizontal: 5, alignItems: 'center' },
+  collectionItem: { width: '33.333%', paddingHorizontal: 5, alignItems: 'center' },
   imageBlock: { width: '100%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 3 },
   imageClip: { width: '100%', height: '100%', borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   image: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
-  collectionLabel: { minHeight: 34, marginTop: 7, color: '#1A1C1D', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
+  collectionLabel: { minHeight: 34, marginTop: 7, color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
 });
