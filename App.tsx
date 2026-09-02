@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  BackHandler,
   Dimensions,
   Easing,
   Image,
@@ -63,6 +64,7 @@ type Product = {
 
 type CartItem = { product: Product; quantity: number };
 type OrderOutcome = { success: boolean; orderId?: string; items: CartItem[]; paymentMethod: 'online' | 'cod'; total: number; tax: number; codFee: number };
+type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'collection' | 'product';
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
@@ -289,7 +291,7 @@ function ProductDetail({ width, cartCount, product, recommendations, onBack, onA
           {choices.map((option, index) => <Image key={`hero-${option.name}-${index}`} source={option.image} style={[styles.detailHero, { width }]} resizeMode="contain" />)}
         </ScrollView>
         <View style={styles.detailOverlayHeader}>
-          <Pressable onPress={onBack} style={styles.detailCircleButton}><Ionicons name="chevron-down" size={23} color={palette.ink} /></Pressable>
+          <Pressable onPress={onBack} style={styles.detailCircleButton}><Ionicons name="arrow-back" size={22} color={palette.ink} /></Pressable>
           <View style={styles.detailOverlayActions}><Pressable style={styles.detailCircleButton}><Ionicons name="heart-outline" size={22} color={palette.ink} /></Pressable><Pressable onPress={() => setShareVisible(true)} style={styles.detailCircleButton}><Ionicons name="share-social-outline" size={21} color={palette.ink} /></Pressable></View>
         </View>
         <View style={styles.detailDots}>{choices.map((_, i) => <View key={i} style={[styles.detailDot, i === colorIndex && styles.detailDotActive]} />)}</View>
@@ -368,6 +370,8 @@ function Storefront() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartPopupVisible, setCartPopupVisible] = useState(false);
   const [cartPreview, setCartPreview] = useState<Product | null>(null);
+  const [productReturnScreen, setProductReturnScreen] = useState<ReturnScreen>('home');
+  const [cartReturnScreen, setCartReturnScreen] = useState<ReturnScreen>('home');
   const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
   const [shopifyProducts, setShopifyProducts] = useState<Product[]>([]);
   const [shopifyMenuItems, setShopifyMenuItems] = useState<ShopifyMenuItem[]>([]);
@@ -391,22 +395,35 @@ function Storefront() {
   const [uploadedCarousels, setUploadedCarousels] = useState<UploadedCarouselData>({});
   const [openingAnimationVisible, setOpeningAnimationVisible] = useState(true);
   const carouselRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen === 'home') return false;
+      if (screen === 'orderSuccess') { setScreen('home'); return true; }
+      if (screen === 'orderFailure') { setScreen('checkout'); return true; }
+      if (screen === 'address' || screen === 'checkout') { setScreen('cart'); return true; }
+      if (screen === 'cart') { setCartPopupVisible(cartItems.length > 0); setScreen(cartReturnScreen); return true; }
+      if (screen === 'product') { setScreen(productReturnScreen); return true; }
+      if (screen === 'categoryCollection' || screen === 'collection') { setScreen('categories'); return true; }
+      if (screen === 'categories') { setScreen('home'); return true; }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [cartItems, cartReturnScreen, productReturnScreen, screen]);
   const homeScrollY = useRef(new Animated.Value(0)).current;
   const collapseBrowseChrome = screen === 'home' || screen === 'categories';
   const transportProgress = useRef(new Animated.Value(0)).current;
   const openingProgress = useRef(new Animated.Value(0)).current;
   const flightTranslateX = transportProgress.interpolate({
-    inputRange: [0, 0.6, 1],
-    outputRange: [10, contentWidth + 52, contentWidth + 52],
+    inputRange: [0, 0.5, 1],
+    outputRange: [-52, contentWidth + 52, contentWidth + 52],
   });
   const truckTranslateX = transportProgress.interpolate({
-    inputRange: [0, 0.4, 1],
+    inputRange: [0, 0.5, 1],
     outputRange: [-52, -52, contentWidth + 52],
   });
-  const nextFlightTranslateX = transportProgress.interpolate({
-    inputRange: [0, 0.8, 1],
-    outputRange: [10 - (contentWidth + 42) / 3, 10 - (contentWidth + 42) / 3, 10],
-  });
+  const flightTrailWidth = transportProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, contentWidth - 28, contentWidth - 28] });
+  const truckTrailWidth = transportProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, contentWidth - 28] });
   const openingFlightTranslateX = openingProgress.interpolate({
     inputRange: [0, 0.6, 1],
     outputRange: [-180, contentWidth + 180, contentWidth + 180],
@@ -418,6 +435,7 @@ function Storefront() {
   const openingFlightOpacity = openingProgress.interpolate({ inputRange: [0, 0.59, 0.62, 1], outputRange: [0.5, 0.5, 0, 0] });
   const openingTruckOpacity = openingProgress.interpolate({ inputRange: [0, 0.38, 0.4, 1], outputRange: [0, 0, 0.5, 0.5] });
   const homeHeaderHeight = homeScrollY.interpolate({ inputRange: [0, 72], outputRange: [82, 0], extrapolate: 'clamp' });
+  const homeTransportHeight = homeScrollY.interpolate({ inputRange: [0, 48], outputRange: [44, 0], extrapolate: 'clamp' });
   const homeHeaderTranslateY = homeScrollY.interpolate({ inputRange: [0, 72], outputRange: [0, -24], extrapolate: 'clamp' });
   const homeHeaderOpacity = homeScrollY.interpolate({ inputRange: [0, 48, 72], outputRange: [1, 0.25, 0], extrapolate: 'clamp' });
   const homeFooterTranslateY = homeScrollY.interpolate({ inputRange: [0, 72], outputRange: [0, 74], extrapolate: 'clamp' });
@@ -510,7 +528,7 @@ function Storefront() {
       toValue: 1,
       duration: 8000,
       easing: Easing.linear,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }));
     transportAnimation.start();
     return () => transportAnimation.stop();
@@ -643,7 +661,19 @@ function Storefront() {
     .map(item => item.product.id === productId ? { ...item, quantity: item.quantity + change } : item)
     .filter(item => item.quantity > 0));
 
+  const openCart = () => {
+    setCartPopupVisible(false);
+    setCartReturnScreen(screen === 'product' || screen === 'collection' || screen === 'categoryCollection' || screen === 'categories' ? screen : 'home');
+    setScreen('cart');
+  };
+
+  const returnFromCart = () => {
+    setCartPopupVisible(cartItems.length > 0);
+    setScreen(cartReturnScreen);
+  };
+
   const openProduct = (product: Product, preferredCollectionId?: string) => {
+    setProductReturnScreen(screen === 'product' || screen === 'collection' || screen === 'categoryCollection' || screen === 'categories' ? screen : 'home');
     setSelectedProduct(product);
     setScreen('product');
     const collectionId = preferredCollectionId ?? product.collectionIds?.[0];
@@ -673,26 +703,26 @@ function Storefront() {
       loadingMore={collectionPageLoadingMore}
       hasNextPage={collectionPageHasNext}
       onLoadMore={loadMoreCollectionProducts}
-      onBack={() => setScreen('home')}
+      onBack={() => setScreen('categories')}
       onSelectCollection={setSelectedCollectionItem}
       onAdd={product => addToCart(mapShopifyProduct(product))}
       onOpenProduct={product => openProduct(mapShopifyProduct(product), selectedCollectionItem.resource?.id)}
     />
-    {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} containerStyle={[styles.collectionCartPopupLayer, { paddingBottom: Math.max(insets.bottom + 10, 38) }]} /> : null}
+    {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={[styles.collectionCartPopupLayer, { paddingBottom: Math.max(insets.bottom + 10, 38) }]} /> : null}
   </SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations.some(item => item.id === selectedProduct.id) ? productPageRecommendations : products;
-    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} onBack={() => setScreen('home')} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setScreen('address'); }} onOpenProduct={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} /> : null}</SafeAreaView>;
+    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} onBack={() => setScreen(productReturnScreen)} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setScreen('address'); }} onOpenProduct={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} /> : null}</SafeAreaView>;
   }
 
-  if (screen === 'cart') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><CartPage items={cartItems} onBack={() => setScreen('home')} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setScreen('address'); } }} /></SafeAreaView>;
+  if (screen === 'cart') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><CartPage items={cartItems} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setScreen('address'); } }} /></SafeAreaView>;
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
 
-  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} onBack={() => setScreen('product')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></SafeAreaView>;
+  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} onBack={() => setScreen('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></SafeAreaView>;
 
-  if (screen === 'address') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><AddressPage onBack={() => setScreen('checkout')} onSave={(address) => { setShippingAddress(address); setScreen('checkout'); }} /></SafeAreaView>;
+  if (screen === 'address') return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><AddressPage onBack={() => setScreen('cart')} onSave={(address) => { setShippingAddress(address); setScreen('checkout'); }} /></SafeAreaView>;
 
   return (
     <SafeAreaView style={[styles.safeArea, screen === 'home' && styles.homeSafeArea]}>
@@ -704,15 +734,6 @@ function Storefront() {
           <View style={styles.collectionHeaderActions}><Ionicons name="search-outline" size={20} color={palette.blue} /><Ionicons name="cart-outline" size={22} color={palette.blue} /></View>
         </View> : collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity, transform: [{ translateY: homeHeaderTranslateY }] }]}>
           <View style={styles.deliveryHeader}>
-          <Animated.View pointerEvents="none" style={[styles.headerFlight, { transform: [{ translateX: flightTranslateX }] }]}>
-            <Ionicons name="airplane" size={38} color={palette.blue} />
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.headerTruck, { transform: [{ translateX: truckTranslateX }] }]}>
-            <MaterialCommunityIcons name="truck-fast-outline" size={42} color={palette.red} />
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.headerFlight, { transform: [{ translateX: nextFlightTranslateX }] }]}>
-            <Ionicons name="airplane" size={38} color={palette.blue} />
-          </Animated.View>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple logo.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>Deliver to..</Text></Pressable>
@@ -724,21 +745,14 @@ function Storefront() {
           </View>
           </View>
         </Animated.View> : <View style={styles.deliveryHeader}>
-          <Animated.View pointerEvents="none" style={[styles.headerFlight, { transform: [{ translateX: flightTranslateX }] }]}>
-            <Ionicons name="airplane" size={38} color={palette.blue} />
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.headerTruck, { transform: [{ translateX: truckTranslateX }] }]}>
-            <MaterialCommunityIcons name="truck-fast-outline" size={42} color={palette.red} />
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.headerFlight, { transform: [{ translateX: nextFlightTranslateX }] }]}>
-            <Ionicons name="airplane" size={38} color={palette.blue} />
-          </Animated.View>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple logo.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>Deliver to..</Text></Pressable>
           </View>
           <View style={styles.deliveryActions}><Pressable onPress={() => selectedProduct && setScreen('checkout')}><Ionicons name="person-circle" size={39} color={palette.ink} /></Pressable></View>
         </View>}
+
+        {screen === 'home' ? <Animated.View style={[styles.transportLane, { height: homeTransportHeight, opacity: homeHeaderOpacity }]} pointerEvents="none"><View style={styles.orbitLine} /><Animated.View style={[styles.transportTrail, styles.flightTrail, { width: flightTrailWidth }]} /><Animated.View style={[styles.transportTrail, styles.truckTrail, { width: truckTrailWidth }]} /><Animated.View style={[styles.transportFlight, { transform: [{ translateX: flightTranslateX }] }]}><Ionicons name="airplane" size={38} color={palette.blue} /></Animated.View><Animated.View style={[styles.transportTruck, { transform: [{ translateX: truckTranslateX }] }]}><MaterialCommunityIcons name="truck-fast-outline" size={42} color={palette.red} /></Animated.View></Animated.View> : null}
 
         {(screen === 'home' || screen === 'categories') && <View style={styles.staticSearchZone}>
           <View style={styles.searchBox}>
@@ -895,7 +909,7 @@ function Storefront() {
           </Pressable>
         </Pressable>
       </Modal>
-      {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={() => { setCartPopupVisible(false); setScreen('cart'); }} containerStyle={collapseBrowseChrome ? { transform: [{ translateY: homeCartTranslateY }] } : undefined} /> : null}
+      {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={collapseBrowseChrome ? { transform: [{ translateY: homeCartTranslateY }] } : undefined} /> : null}
       {collapseBrowseChrome ? <View pointerEvents="none" style={[styles.bottomSafeFill, { height: insets.bottom }]} /> : null}
       {openingAnimationVisible ? <View pointerEvents="none" style={styles.openingAnimationOverlay}>
         <Text style={styles.openingAnimationMessage}>Discover world‑class products, curated for you.</Text>
@@ -930,8 +944,13 @@ const styles = StyleSheet.create({
   openingVehicle: { position: 'absolute' },
   homeCollapsibleHeader: { overflow: 'hidden', backgroundColor: '#F5F5F5' },
   deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5' },
-  headerFlight: { position: 'absolute', left: 0, top: 9, opacity: 0.5 },
-  headerTruck: { position: 'absolute', left: 0, bottom: -7, opacity: 0.5 },
+  transportLane: { overflow: 'hidden', position: 'relative', backgroundColor: '#F5F5F5' },
+  orbitLine: { position: 'absolute', left: 14, right: 14, top: 21, height: 4, borderRadius: 2, backgroundColor: palette.red },
+  transportTrail: { position: 'absolute', left: 14, top: 21, height: 4, borderRadius: 2 },
+  flightTrail: { backgroundColor: palette.blue },
+  truckTrail: { backgroundColor: palette.red },
+  transportFlight: { position: 'absolute', left: 0, top: 4 },
+  transportTruck: { position: 'absolute', left: 0, top: 2 },
   deliveryBrandBlock: { zIndex: 1, marginLeft: 10 },
   deliveryLogo: { width: 190, height: 40, marginLeft: -24, alignSelf: 'flex-start' },
   addAddressButton: { marginTop: 4, marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 2 },
