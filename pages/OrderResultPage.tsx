@@ -23,7 +23,7 @@ export function OrderResultPage({ success, orderId, items, address, paymentMetho
     else Alert.alert('Invoice ready', invoice.uri);
   };
   return <View style={s.page}>
-    <View style={s.header}><Pressable onPress={onHome} hitSlop={10}><Ionicons name="arrow-back" size={25} color="#1A1C1D" /></Pressable><Text style={s.headerTitle}>ORDER DETAILS</Text><View style={s.spacer} /></View>
+    <View style={[s.header, { backgroundColor: '#0A254A', borderColor: '#294565' }]}><Pressable onPress={onHome} hitSlop={10}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable><Text style={[s.headerTitle, { color: '#FFFFFF' }]}>ORDER DETAILS</Text><View style={s.spacer} /></View>
     <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={[s.icon, success ? s.successIcon : s.failIcon]}><Ionicons name={success ? 'checkmark' : 'close'} size={36} color="#FFFFFF" /></View>
       <Text style={s.heading}>{heading}</Text>

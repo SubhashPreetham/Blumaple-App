@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from '../src/shopify';
 
 type Props = {
@@ -26,6 +26,25 @@ const sortOptions: Array<{ label: string; value: SortMode }> = [
   { label: 'Low', value: 'Price: Low' },
   { label: 'Name', value: 'Name' },
 ];
+
+function CollectionCartonLoader() {
+  const progress = useRef(new Animated.Value(0)).current;
+  const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
+  const tilt = progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '-7deg', '0deg'] });
+  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+
+  useEffect(() => {
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(progress, { toValue: 1, duration: 480, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(progress, { toValue: 0, duration: 480, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.delay(160),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [progress]);
+
+  return <View style={s.collectionLoader} accessibilityLabel="Loading products"><Animated.View style={{ transform: [{ translateY: lift }, { rotate: tilt }, { scale }] }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View></View>;
+}
 
 export function CategoryCollectionPage({ category, selectedCollection, previews, products, loading, totalProducts, loadingMore, hasNextPage, onBack, onSelectCollection, onLoadMore, onAdd, onOpenProduct }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('Recommended');
@@ -71,10 +90,10 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const collections = category.items.length ? category.items : [category];
 
   return <View style={s.page}>
-    <View style={s.header}>
-      <Pressable onPress={onBack} style={s.headerButton}><Ionicons name="arrow-back" size={25} color="#1A1C1D" /></Pressable>
-      <View style={s.headerCopy}><Text numberOfLines={1} style={s.headerTitle}>{category.title.trim()}</Text><Text style={s.headerSubtitle}>Shop from verified collections</Text></View>
-      <Pressable style={s.headerButton}><Ionicons name="search-outline" size={25} color="#1A1C1D" /></Pressable>
+    <View style={[s.header, { backgroundColor: '#0A254A', borderColor: '#294565' }]}>
+      <Pressable onPress={onBack} style={[s.headerButton, { borderColor: 'rgba(255,255,255,0.45)' }]}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable>
+      <View style={s.headerCopy}><Text numberOfLines={1} style={[s.headerTitle, { color: '#FFFFFF' }]}>{category.title.trim()}</Text><Text style={[s.headerSubtitle, { color: '#B9D6FF' }]}>Shop from verified collections</Text></View>
+      <Pressable style={[s.headerButton, { borderColor: 'rgba(255,255,255,0.45)' }]}><Ionicons name="search-outline" size={25} color="#FFFFFF" /></Pressable>
     </View>
 
     <View style={s.content}>
@@ -99,7 +118,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
         </View>
         <View style={s.selectedHeading}><Text style={s.selectedTitle}>{selectedCollection.title.trim()}</Text><Text style={s.resultCount}>{totalProducts ?? products.length} products</Text></View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.productScroll}>
-          {loading ? <ActivityIndicator size="large" color="#3F72E5" style={s.loader} /> : <View style={s.productGrid}>
+          {loading ? <CollectionCartonLoader /> : <View style={s.productGrid}>
             {visibleProducts.map(product => {
               const variant = product.variants.nodes[0];
               const imageUrl = product.images.nodes[0]?.url;
@@ -202,7 +221,7 @@ const s = StyleSheet.create({
   selectedTitle: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 20, fontWeight: '900' },
   resultCount: { marginTop: 1, color: '#777777', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 12, fontWeight: '600' },
   productScroll: { paddingTop: 12, paddingHorizontal: 10, paddingBottom: 30 },
-  loader: { marginTop: 60 },
+  collectionLoader: { height: 180, alignItems: 'center', justifyContent: 'center' },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   productCard: { width: '48%' },
   productImageBlock: { width: '100%', aspectRatio: 0.92, borderWidth: 1, borderColor: '#E7E7E7', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
