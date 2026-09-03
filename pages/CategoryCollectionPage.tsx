@@ -12,10 +12,12 @@ type Props = {
   totalProducts: number | null;
   loadingMore: boolean;
   hasNextPage: boolean;
+  favoriteIds: Set<string>;
   onBack: () => void;
   onSelectCollection: (collection: ShopifyMenuItem) => void;
   onLoadMore: () => void;
   onAdd: (product: ShopifyProduct) => void;
+  onToggleFavorite: (product: ShopifyProduct) => void;
   onOpenProduct: (product: ShopifyProduct) => void;
 };
 
@@ -46,7 +48,7 @@ function CollectionCartonLoader() {
   return <View style={s.collectionLoader} accessibilityLabel="Loading products"><Animated.View style={{ transform: [{ translateY: lift }, { rotate: tilt }, { scale }] }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View></View>;
 }
 
-export function CategoryCollectionPage({ category, selectedCollection, previews, products, loading, totalProducts, loadingMore, hasNextPage, onBack, onSelectCollection, onLoadMore, onAdd, onOpenProduct }: Props) {
+export function CategoryCollectionPage({ category, selectedCollection, previews, products, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, onBack, onSelectCollection, onLoadMore, onAdd, onToggleFavorite, onOpenProduct }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('Recommended');
   const [filterVisible, setFilterVisible] = useState(false);
   const [sortVisible, setSortVisible] = useState(false);
@@ -131,7 +133,9 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                 <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
                   {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
                   {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>-{discountPercent}%</Text></View> : null}
-                  <Ionicons name="heart-outline" size={20} color="#3F72E5" style={s.heart} />
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}>
+                    <Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={20} color={favoriteIds.has(product.id) ? '#B85C5C' : '#3F72E5'} />
+                  </Pressable>
                 <Pressable onPress={availableForSale ? () => onAdd(product) : () => {}} style={[s.imageActionButton, !availableForSale && s.notifyButton]}><Text style={[s.imageActionText, !availableForSale && s.notifyButtonText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
                 </Pressable>
                 <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
@@ -243,7 +247,7 @@ const s = StyleSheet.create({
   discountedPrice: { color: '#D83434' },
   comparePrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
   empty: { width: '100%', marginTop: 50, color: '#777777', textAlign: 'center' },
-  loadMoreButton: { alignSelf: 'center', minWidth: 140, height: 44, marginTop: 24, paddingHorizontal: 24, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5' },
+  loadMoreButton: { alignSelf: 'center', minWidth: 140, height: 44, marginTop: 24, paddingHorizontal: 24, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E53935', shadowColor: '#7A1714', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 7 },
   loadMoreButtonDisabled: { opacity: 0.65 },
   loadMoreButtonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
   filterBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.42)' },

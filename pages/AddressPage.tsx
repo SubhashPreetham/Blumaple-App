@@ -10,7 +10,7 @@ function Field({ placeholder, value, onChangeText, keyboardType = 'default', max
 }
 
 const indianStatesAndUTs = ['Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'];
-const savedAddresses = [
+export const savedAddresses = [
   { label: 'Home', name: 'Arjun Kumar', phone: '9876543210', company: '', building: 'Flat 203, Maple Residency', line: 'Road No. 12, Banjara Hills', city: 'Hyderabad', state: 'Telangana', pincode: '500034', gstin: '36ABCDE1234F1Z5' },
   { label: 'Office', name: 'Arjun Kumar', phone: '9123456780', company: 'Blumaple Technologies', building: 'Unit 14, Tech Park', line: 'HITEC City, Madhapur', city: 'Hyderabad', state: 'Telangana', pincode: '500081', gstin: '36AABCB1234C1ZP' },
 ] as const;
