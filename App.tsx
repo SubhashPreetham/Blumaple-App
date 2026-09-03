@@ -406,7 +406,7 @@ function HelpFab({ product, cartVisible = false }: { product?: Product | null; c
   </View>;
 }
 
-function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout, onOpenProduct }: { items: CartItem[]; recentlyViewed: Product[]; onBack: () => void; onChangeQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void }) {
+function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout, onOpenProduct, onAdd }: { items: CartItem[]; recentlyViewed: Product[]; onBack: () => void; onChangeQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onAdd: (product: Product) => void }) {
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = items.reduce((total, { product, quantity }) => total + (product.unitPrice ?? (Number(product.price.replace(/[^0-9.]/g, '')) || 0)) * quantity, 0);
   const cartTotalText = money(String(cartTotal), items[0]?.product.currencyCode ?? 'INR');
@@ -417,7 +417,7 @@ function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout,
       <View style={styles.cartListCopy}><Text numberOfLines={3} style={styles.cartListName}>{product.name}</Text><Text style={styles.cartListPrice}>{product.price}</Text></View>
       <View style={styles.cartListActions}><View style={styles.cartQuantityControl}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, -1)}><Text style={styles.cartQuantityButton}>−</Text></Pressable><Text style={styles.cartQuantityValue}>{quantity}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, 1)}><Text style={styles.cartQuantityButton}>+</Text></Pressable></View></View>
       <Text numberOfLines={1} style={styles.cartLineTotal}>{product.unitPrice ? money(String(product.unitPrice * quantity), product.currencyCode ?? 'INR') : product.price}</Text>
-    </View>)}{recentlyViewed.length ? <View style={styles.cartSuggestions}><Text style={styles.cartSuggestionsTitle}>Suggestions</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cartSuggestionRow}>{recentlyViewed.map(product => <Pressable key={product.id} onPress={() => onOpenProduct(product)} style={styles.cartSuggestionCard}><Image source={product.image} style={styles.cartSuggestionImage} resizeMode="contain" /><Text numberOfLines={2} style={styles.cartSuggestionName}>{product.name}</Text><Text style={styles.cartSuggestionPrice}>{product.price}</Text></Pressable>)}</ScrollView></View> : null}</ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
+    </View>)}{recentlyViewed.length ? <View style={styles.cartSuggestions}><Text style={styles.cartSuggestionsTitle}>Suggestions</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cartSuggestionRow}>{recentlyViewed.map(product => <View key={product.id} style={styles.cartSuggestionCard}><Pressable onPress={() => onOpenProduct(product)}><Image source={product.image} style={styles.cartSuggestionImage} resizeMode="contain" /><Text numberOfLines={2} style={styles.cartSuggestionName}>{product.name}</Text><Text style={styles.cartSuggestionPrice}>{product.price}</Text></Pressable><Pressable onPress={() => onAdd(product)} style={styles.cartSuggestionAdd}><Text style={styles.cartSuggestionAddText}>ADD</Text></Pressable></View>)}</ScrollView></View> : null}</ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
     {items.length ? <View style={styles.cartCheckoutBar}><View style={styles.cartTotalBlock}><Text style={styles.cartItemCount}>{itemCount} {itemCount === 1 ? 'item' : 'items'} in cart</Text><Text style={styles.cartTotalText}>Total: {cartTotalText}</Text></View><Pressable onPress={onCheckout} style={styles.cartCheckoutButton}><Text style={styles.cartCheckoutText}>Proceed to checkout</Text></Pressable></View> : null}
   </View>;
 }
@@ -849,7 +849,7 @@ function Storefront() {
       seenSuggestionIds.add(product.id);
       return true;
     }).slice(0, 16);
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); setScreen('address'); } }} onOpenProduct={product => openProduct(product)} /></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); setScreen('address'); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} /></SafeAreaView>;
   }
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
@@ -1128,7 +1128,7 @@ const styles = StyleSheet.create({
   browseContent: { paddingBottom: 10 },
   carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: homeChrome },
   carouselFade: { marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
-  carouselLoading: { height: 238, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E9EDF2' },
+  carouselLoading: { height: 238, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A254A' },
   carouselLoadingText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
   cartonLoader: { width: 66, height: 58, alignItems: 'center', justifyContent: 'flex-end' },
   zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: homeChrome },
@@ -1146,8 +1146,8 @@ const styles = StyleSheet.create({
   blinkTabText: { marginTop: 6, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '500', textAlign: 'center' },
   blinkTabTextActive: { color: palette.white, fontWeight: '800' },
   promoCards: { gap: 12, paddingVertical: 8 },
-  promoCard: { height: 270, borderRadius: 21, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 7, elevation: 4 },
-  promoImageFrame: { ...StyleSheet.absoluteFillObject, borderRadius: 21, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  promoCard: { height: 270, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 21, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 7, elevation: 4 },
+  promoImageFrame: { ...StyleSheet.absoluteFillObject, borderRadius: 19, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   promoImage: { width: '100%', height: '100%', transform: [{ scale: 1.28 }] },
   promoCopy: { position: 'absolute', left: 13, right: 10, bottom: 15 },
   promoTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 17, lineHeight: 20, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.58)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
@@ -1288,6 +1288,8 @@ const styles = StyleSheet.create({
   cartSuggestionImage: { width: '100%', height: 88, borderRadius: 7, backgroundColor: '#FFFFFF' },
   cartSuggestionName: { marginTop: 7, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, fontWeight: '700' },
   cartSuggestionPrice: { marginTop: 3, color: '#D83434', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  cartSuggestionAdd: { height: 30, marginTop: 7, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  cartSuggestionAddText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   emptyCart: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyCartTitle: { marginTop: 14, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
   emptyCartCopy: { marginTop: 6, color: '#697386', fontFamily: 'Inter_400Regular', fontSize: 13 },
