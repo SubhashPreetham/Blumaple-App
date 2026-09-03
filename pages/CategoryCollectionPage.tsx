@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from '../src/shopify';
 
@@ -31,21 +31,20 @@ const sortOptions: Array<{ label: string; value: SortMode }> = [
 
 function CollectionCartonLoader() {
   const progress = useRef(new Animated.Value(0)).current;
-  const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
-  const tilt = progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '-7deg', '0deg'] });
-  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const closed = progress.interpolate({ inputRange: [0, .42, .58, 1], outputRange: [1, 1, 0, 0] });
+  const open = progress.interpolate({ inputRange: [0, .42, .58, 1], outputRange: [0, 0, 1, 1] });
+  const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [2, -5] });
 
   useEffect(() => {
     const animation = Animated.loop(Animated.sequence([
-      Animated.timing(progress, { toValue: 1, duration: 480, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(progress, { toValue: 0, duration: 480, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.delay(160),
+      Animated.timing(progress, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }), Animated.delay(260),
+      Animated.timing(progress, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }), Animated.delay(220),
     ]));
     animation.start();
     return () => animation.stop();
   }, [progress]);
 
-  return <View style={s.collectionLoader} accessibilityLabel="Loading products"><Animated.View style={{ transform: [{ translateY: lift }, { rotate: tilt }, { scale }] }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View></View>;
+  return <View style={s.collectionLoader} accessibilityLabel="Loading products"><View style={{ width: 46, height: 46 }}><Animated.View style={{ position: 'absolute', opacity: closed }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View><Animated.View style={{ position: 'absolute', opacity: open, transform: [{ translateY: lift }] }}><MaterialCommunityIcons name="package-variant" size={46} color="#B97435" /></Animated.View></View></View>;
 }
 
 export function CategoryCollectionPage({ category, selectedCollection, previews, products, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, onBack, onSelectCollection, onLoadMore, onAdd, onToggleFavorite, onOpenProduct }: Props) {
@@ -54,6 +53,26 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const [sortVisible, setSortVisible] = useState(false);
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [selectedShipping, setSelectedShipping] = useState<Set<string>>(new Set());
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchProgress = useRef(new Animated.Value(0)).current;
+  const searchInputRef = useRef<TextInput>(null);
+  const searchWidth = searchProgress.interpolate({ inputRange: [0, 1], outputRange: [46, Math.min(Dimensions.get('window').width, 430) - 24] });
+  const headerContentOpacity = searchProgress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [1, 0, 0] });
+  const searchInputOpacity = searchProgress.interpolate({ inputRange: [0, 0.38, 1], outputRange: [0, 0, 1] });
+  const searchBackground = searchProgress.interpolate({ inputRange: [0, 0.45, 1], outputRange: ['#0A254A', '#0A254A', '#FFFFFF'] });
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    Animated.timing(searchProgress, { toValue: 1, duration: 340, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start(() => searchInputRef.current?.focus());
+  };
+  const closeSearch = () => {
+    searchInputRef.current?.blur();
+    Animated.timing(searchProgress, { toValue: 0, duration: 320, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start(() => {
+      setSearchOpen(false);
+      setSearchQuery('');
+    });
+  };
 
   useEffect(() => {
     setSelectedBrands(new Set());
@@ -67,6 +86,8 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
 
   const visibleProducts = useMemo(() => {
     const filtered = products.filter(product => {
+      const query = searchQuery.trim().toLowerCase();
+      if (query && !`${product.title} ${product.vendor} ${product.brandName?.value ?? ''}`.toLowerCase().includes(query)) return false;
       const brand = product.brandName?.value.trim() ?? '';
       if (selectedBrands.size && !selectedBrands.has(brand)) return false;
       if (selectedShipping.size && !selectedShipping.has(product.vendor.trim())) return false;
@@ -76,7 +97,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     if (sortMode === 'Price: High') filtered.sort((a, b) => Number(b.variants.nodes[0]?.price.amount ?? 0) - Number(a.variants.nodes[0]?.price.amount ?? 0));
     if (sortMode === 'Name') filtered.sort((a, b) => a.title.localeCompare(b.title));
     return filtered;
-  }, [products, selectedBrands, selectedShipping, sortMode]);
+  }, [products, searchQuery, selectedBrands, selectedShipping, sortMode]);
 
   const toggleBrand = (brand: string) => setSelectedBrands(current => {
     const next = new Set(current);
@@ -93,9 +114,12 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
 
   return <View style={s.page}>
     <View style={[s.header, { backgroundColor: '#0A254A', borderColor: '#294565' }]}>
-      <Pressable onPress={onBack} style={[s.headerButton, { borderColor: 'rgba(255,255,255,0.45)' }]}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable>
-      <View style={s.headerCopy}><Text numberOfLines={1} style={[s.headerTitle, { color: '#FFFFFF' }]}>{category.title.trim()}</Text><Text style={[s.headerSubtitle, { color: '#B9D6FF' }]}>Shop from verified collections</Text></View>
-      <Pressable style={[s.headerButton, { borderColor: 'rgba(255,255,255,0.45)' }]}><Ionicons name="search-outline" size={25} color="#FFFFFF" /></Pressable>
+      <Animated.View pointerEvents={searchOpen ? 'none' : 'auto'} style={{ opacity: headerContentOpacity }}><Pressable onPress={onBack} style={[s.headerButton, { borderColor: 'rgba(255,255,255,0.45)' }]}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable></Animated.View>
+      <Animated.View pointerEvents={searchOpen ? 'none' : 'auto'} style={[s.headerCopy, { opacity: headerContentOpacity }]}><Text numberOfLines={1} style={[s.headerTitle, { color: '#FFFFFF' }]}>{category.title.trim()}</Text><Text style={[s.headerSubtitle, { color: '#B9D6FF' }]}>Shop from verified collections</Text></Animated.View>
+      <Animated.View style={[s.searchControl, { width: searchWidth, backgroundColor: searchBackground }]}>
+        {searchOpen ? <Animated.View style={[s.searchInputWrap, { opacity: searchInputOpacity }]}><TextInput ref={searchInputRef} value={searchQuery} onChangeText={setSearchQuery} placeholder="Search products" placeholderTextColor="#7B8490" returnKeyType="search" style={s.searchInput} /></Animated.View> : null}
+        <Pressable onPress={searchOpen ? closeSearch : openSearch} style={[s.searchIconButton, searchOpen && s.searchIconButtonOpen]}><Ionicons name={searchOpen ? 'close' : 'search-outline'} size={24} color={searchOpen ? '#0A254A' : '#FFFFFF'} /></Pressable>
+      </Animated.View>
     </View>
 
     <View style={s.content}>
@@ -204,6 +228,11 @@ const s = StyleSheet.create({
   headerCopy: { flex: 1 },
   headerTitle: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   headerSubtitle: { marginTop: 3, color: '#287F7A', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
+  searchControl: { position: 'absolute', right: 12, height: 46, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', borderRadius: 23, backgroundColor: '#0A254A', zIndex: 5 },
+  searchInputWrap: { flex: 1, height: 44 },
+  searchInput: { flex: 1, minWidth: 0, height: 44, paddingLeft: 16, paddingRight: 4, color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 14, backgroundColor: '#FFFFFF' },
+  searchIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  searchIconButtonOpen: { backgroundColor: '#FFFFFF' },
   content: { flex: 1, flexDirection: 'row' },
   collectionRail: { width: 92, flexGrow: 0, backgroundColor: '#E9EDF2', borderRightWidth: 1, borderColor: '#D5DBE3' },
   collectionRailContent: { paddingVertical: 10, paddingBottom: 30 },

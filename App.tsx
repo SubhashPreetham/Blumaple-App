@@ -8,6 +8,7 @@ import {
   Easing,
   Image,
   ImageSourcePropType,
+  Keyboard,
   Linking,
   Modal,
   Pressable,
@@ -25,7 +26,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
+import { fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, searchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AddressPage } from './pages/AddressPage';
 import { OrderResultPage } from './pages/OrderResultPage';
@@ -76,12 +77,13 @@ type Product = {
   techSpec?: string;
   collectionIds?: string[];
   handle?: string;
+  searchKeywords?: string;
 };
 
 type CartItem = { product: Product; quantity: number };
 type HistoryOrder = { id: string; date: string; products: Product[]; amount: string; status: 'Delivered' | 'Shipped' | 'Processing' | 'Cancelled' | 'Returned'; deliveredAt?: string; shippingAddress: string };
 type OrderOutcome = { success: boolean; orderId?: string; items: CartItem[]; paymentMethod: 'online' | 'cod'; total: number; tax: number; codFee: number };
-type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'product' | 'cart';
+type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'product' | 'cart';
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
@@ -173,6 +175,7 @@ function mapShopifyProduct(product: ShopifyProduct): Product {
     techSpec: product.techSpec?.value ?? '',
     collectionIds: product.collections.nodes.map(collection => collection.id),
     handle: product.handle,
+    searchKeywords: [...product.tags, product.description, product.techSpec?.value ?? '', product.variants.nodes[0]?.sku ?? '', ...product.collections.nodes.flatMap(collection => [collection.title, collection.handle])].join(' '),
   };
 }
 
@@ -200,12 +203,14 @@ function parseTechSpecTable(value?: string) {
 }
 
 function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFavorite = true, collectionLayout = false }: { item: Product; width: number; favorite: boolean; onFavorite: () => void; onAdd: () => void; onOpen?: () => void; showFavorite?: boolean; collectionLayout?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [item.image]);
   if (collectionLayout) {
     const availableForSale = item.availableForSale ?? true;
     const discountLabel = item.discount ? `-${item.discount.replace(/\s*off/i, '')}` : '';
     return <View style={[styles.collectionProductCard, { width }]}>
       <Pressable onPress={onOpen} style={styles.collectionProductVisual}>
-        <Image source={item.image} style={[styles.collectionProductImage, !availableForSale && styles.collectionUnavailable]} resizeMode="contain" />
+        {imageFailed ? <Ionicons name="image-outline" size={34} color="#A7B0BC" /> : <Image source={item.image} style={[styles.collectionProductImage, !availableForSale && styles.collectionUnavailable]} resizeMode="contain" onError={() => setImageFailed(true)} />}
         {!availableForSale ? <View style={styles.collectionComingSoon}><Text style={styles.collectionComingSoonText}>Coming soon</Text></View> : discountLabel ? <View style={styles.collectionDiscountBadge}><Text style={styles.collectionDiscountText}>{discountLabel}</Text></View> : null}
         {showFavorite ? <Pressable hitSlop={10} onPress={onFavorite} style={styles.collectionHeart}><Ionicons name={favorite ? 'heart' : 'heart-outline'} size={21} color={favorite ? WISHLIST_ACTIVE_COLOR : palette.blue} /></Pressable> : null}
         <Pressable onPress={availableForSale ? onAdd : () => {}} style={[styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction]}><Text style={[styles.collectionImageActionText, !availableForSale && styles.collectionNotifyText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
@@ -217,7 +222,7 @@ function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFav
   return (
     <View style={[styles.productCard, { width }]}>
       <Pressable onPress={onOpen} style={styles.productVisual}>
-        <Image source={item.image} style={styles.productImage} resizeMode="contain" />
+        {imageFailed ? <Ionicons name="image-outline" size={30} color="#A7B0BC" /> : <Image source={item.image} style={styles.productImage} resizeMode="contain" onError={() => setImageFailed(true)} />}
         {showFavorite ? <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${item.name}`} hitSlop={10} onPress={onFavorite} style={styles.heart}>
           <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={25} color={favorite ? WISHLIST_ACTIVE_COLOR : palette.blue} />
         </Pressable> : null}
@@ -239,26 +244,46 @@ function SectionTitle({ children }: React.PropsWithChildren) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
-function CartonBoxLoader() {
+function CartonBoxLoader({ size = 46 }: { size?: number }) {
   const flapProgress = useRef(new Animated.Value(0)).current;
-  const lift = flapProgress.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
-  const tilt = flapProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '-7deg', '0deg'] });
-  const scale = flapProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const closedOpacity = flapProgress.interpolate({ inputRange: [0, 0.42, 0.58, 1], outputRange: [1, 1, 0, 0] });
+  const openOpacity = flapProgress.interpolate({ inputRange: [0, 0.42, 0.58, 1], outputRange: [0, 0, 1, 1] });
+  const lidLift = flapProgress.interpolate({ inputRange: [0, 1], outputRange: [2, -4] });
+  const scale = flapProgress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.06] });
 
   useEffect(() => {
     const animation = Animated.loop(Animated.sequence([
-      Animated.timing(flapProgress, { toValue: 1, duration: 480, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(flapProgress, { toValue: 0, duration: 480, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.delay(160),
+      Animated.timing(flapProgress, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+      Animated.delay(260),
+      Animated.timing(flapProgress, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+      Animated.delay(220),
     ]));
     animation.start();
     return () => animation.stop();
   }, [flapProgress]);
 
-  return <View style={styles.cartonLoader} accessibilityLabel="Loading collections">
-    <Animated.View style={{ transform: [{ translateY: lift }, { rotate: tilt }, { scale }] }}>
-      <MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" />
+  return <View style={[styles.cartonLoader, { width: size + 20, height: size + 12 }]} accessibilityLabel="Loading collections">
+    <Animated.View style={[styles.openingCarton, { width: size, height: size }]}>
+      <Animated.View style={[styles.openingCartonIcon, { opacity: closedOpacity, transform: [{ scale }] }]}><MaterialCommunityIcons name="package-variant-closed" size={size} color="#B97435" /></Animated.View>
+      <Animated.View style={[styles.openingCartonIcon, { opacity: openOpacity, transform: [{ translateY: lidLift }, { scale }] }]}><MaterialCommunityIcons name="package-variant" size={size} color="#B97435" /></Animated.View>
     </Animated.View>
+  </View>;
+}
+
+function CollectionArtwork({ source }: { source?: ImageSourcePropType }) {
+  const [loaded, setLoaded] = useState(false);
+  const sourceKey = typeof source === 'object' && source && 'uri' in source ? source.uri : source;
+  useEffect(() => {
+    let active = true;
+    setLoaded(false);
+    if (typeof sourceKey === 'string') Image.prefetch(sourceKey).then(() => { if (active) setLoaded(true); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [sourceKey]);
+
+  if (!source) return <CartonBoxLoader size={28} />;
+  return <View style={styles.collectionArtwork}>
+    {!loaded ? <CartonBoxLoader size={28} /> : null}
+    <Image source={source} style={[styles.shopCategoryImage, !loaded && styles.collectionArtworkHidden]} resizeMode="contain" onLoad={() => setLoaded(true)} onError={() => setLoaded(false)} />
   </View>;
 }
 
@@ -274,6 +299,12 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
   const [expanded, setExpanded] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [shareVisible, setShareVisible] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviews, setReviews] = useState<Array<{ id: string; name: string; rating: number; text: string }>>([
+    { id: 'verified-1', name: 'Verified customer', rating: 5, text: 'Excellent quality and secure packaging. The product matched the description.' },
+    { id: 'verified-2', name: 'Blumaple customer', rating: 4, text: 'Good product and helpful delivery updates throughout the order.' },
+  ]);
   const detailGalleryRef = useRef<ScrollView>(null);
   const choices = product.images?.length ? product.images.map((image, index) => ({ name: index === 0 ? 'Default' : `View ${index + 1}`, image })) : detailColors;
   const availableForSale = product.availableForSale ?? true;
@@ -323,6 +354,14 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
     ['Specifications & details', ''],
     ['Product description', product.description || 'Product details are available from the Shopify store.'],
   ] as const;
+  const reviewAverage = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
+  const submitReview = () => {
+    if (!reviewRating) { Alert.alert('Choose a rating', 'Please select between one and five stars.'); return; }
+    if (!reviewText.trim()) { Alert.alert('Write a review', 'Please share your experience before submitting.'); return; }
+    setReviews(current => [{ id: `review-${Date.now()}`, name: 'You', rating: reviewRating, text: reviewText.trim() }, ...current]);
+    setReviewRating(0);
+    setReviewText('');
+  };
 
   return <View style={[styles.detailPage, { width }]}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailContent}>
@@ -357,6 +396,15 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
         </View>
       </View>
       {rows.map(([title, copy]) => { const open = expanded === title; const specifications = title === 'Specifications & details'; return <Pressable key={title} onPress={() => setExpanded(open ? null : title)} style={styles.accordion}><View style={styles.accordionHeading}><Text style={styles.accordionTitle}>{title}</Text><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} /></View>{open ? specifications ? <View style={styles.specTable}>{specificationRows.map(([heading, detail], index) => <View key={`${heading}-${index}`} style={[styles.specRow, index === specificationRows.length - 1 && styles.specRowLast]}><View style={styles.specHeadingCell}><Text style={styles.specHeadingText}>{heading}</Text></View><View style={styles.specDetailCell}><Text style={styles.specDetailText}>{detail}</Text></View></View>)}</View> : <Text style={styles.accordionCopy}>{copy}</Text> : null}</Pressable>; })}
+      <View style={styles.reviewSection}>
+        <View style={styles.reviewHeadingRow}><View><Text style={styles.reviewHeading}>Ratings &amp; Reviews</Text><Text style={styles.reviewSummary}>{reviewAverage.toFixed(1)} ★ · {reviews.length} reviews</Text></View><Ionicons name="chatbox-ellipses-outline" size={25} color={palette.blue} /></View>
+        <Text style={styles.reviewPrompt}>Rate this product</Text>
+        <View style={styles.reviewStars}>{[1, 2, 3, 4, 5].map(star => <Pressable key={star} onPress={() => setReviewRating(star)} hitSlop={5}><Ionicons name={star <= reviewRating ? 'star' : 'star-outline'} size={28} color="#F2A900" /></Pressable>)}</View>
+        <TextInput value={reviewText} onChangeText={setReviewText} multiline textAlignVertical="top" placeholder="Write your review" placeholderTextColor="#8B929D" style={styles.reviewInput} />
+        <Pressable onPress={submitReview} style={styles.reviewSubmit}><Text style={styles.reviewSubmitText}>Submit review</Text></Pressable>
+        <Text style={styles.reviewListHeading}>Customer reviews</Text>
+        {reviews.map(review => <View key={review.id} style={styles.productReviewCard}><View style={styles.reviewCardHeader}><Text style={styles.reviewName}>{review.name}</Text><Text style={styles.reviewCardRating}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</Text></View><Text style={styles.reviewBody}>{review.text}</Text></View>)}
+      </View>
       <Text style={styles.similarTitle}>You may also like</Text>
       <Text style={styles.similarSubtitle}>Combine your style with these products</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.detailRecommendations}>{recommendations.filter(item => item.id !== product.id).slice(0, 12).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={150} favorite={favoriteIds.has(item.id)} collectionLayout onFavorite={() => onFavorite(item)} onAdd={() => onAdd(item)} onOpen={() => onOpenProduct(item)} />)}</ScrollView>
@@ -380,19 +428,19 @@ function CartPopup({ item, count, onOpen, containerStyle }: { item: Product | nu
   </Pressable></Animated.View>;
 }
 
-function WishlistCard({ item, width, onOpen, onRemove, onAdd }: { item: Product; width: number; onOpen: () => void; onRemove: () => void; onAdd: () => void }) {
-  return <View style={[styles.wishlistCard, { width }]}>
+function WishlistCard({ item, width, onOpen, onRemove, onAdd }: { item: Product; width: number; onOpen: () => void; onRemove?: () => void; onAdd: () => void }) {
+  const available = item.availableForSale !== false;
+  return <View style={[styles.wishlistCard, { width }]}> 
     <Pressable onPress={onOpen} style={styles.wishlistProductLink}>
-      <View style={styles.wishlistImageFrame}><Image source={item.image} style={styles.wishlistImage} resizeMode="contain" /></View>
+      <View style={styles.wishlistImageFrame}><Image source={item.image} style={styles.wishlistImage} resizeMode="contain" />{item.discount ? <View style={styles.wishlistDiscountBadge}><Text style={styles.wishlistDiscountBadgeText}>{item.discount}</Text></View> : null}</View>
       <Text numberOfLines={2} style={styles.wishlistTitle}>{item.name}</Text>
       <View style={styles.wishlistPriceRow}>
-        <Text style={styles.wishlistPrice}>{item.price}</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.wishlistPrice}>{item.price}</Text>
         {item.oldPrice ? <Text numberOfLines={1} style={styles.wishlistOldPrice}>{item.oldPrice}</Text> : null}
-        {item.discount ? <Text numberOfLines={1} style={styles.wishlistDiscount}>{item.discount}</Text> : null}
       </View>
     </Pressable>
-    <Pressable onPress={onAdd} style={styles.wishlistAddButton}><Ionicons name="cart-outline" size={17} color="#FFFFFF" /><Text style={styles.wishlistAddText}>Add to cart</Text></Pressable>
-    <Pressable onPress={onRemove} style={styles.wishlistRemoveButton}><Ionicons name="trash-outline" size={16} color={palette.red} /><Text style={styles.wishlistRemoveText}>Remove</Text></Pressable>
+    <Pressable onPress={available ? onAdd : () => Alert.alert('Notify me', `We’ll let you know when ${item.name} is available.`)} style={[styles.wishlistAddButton, !available && styles.wishlistNotifyButton]}><Ionicons name={available ? 'cart-outline' : 'notifications-outline'} size={17} color="#FFFFFF" /><Text style={styles.wishlistAddText}>{available ? 'Add to cart' : 'Notify'}</Text></Pressable>
+    {onRemove ? <Pressable onPress={onRemove} style={styles.wishlistRemoveButton}><Ionicons name="trash-outline" size={16} color={palette.red} /><Text style={styles.wishlistRemoveText}>Remove</Text></Pressable> : null}
   </View>;
 }
 
@@ -418,7 +466,7 @@ function HelpFab({ product, cartBottom = 0 }: { product?: Product | null; cartBo
       <Pressable onPress={() => Linking.openURL('tel:+917386714141')} style={styles.helpAction}><Ionicons name="call-outline" size={25} color="#FFFFFF" /></Pressable>
       <Pressable onPress={openWhatsApp} style={styles.helpAction}><Ionicons name="logo-whatsapp" size={25} color="#FFFFFF" /></Pressable>
     </View> : null}
-    <Pressable onPress={() => setExpanded(value => !value)} style={styles.helpMain}><Ionicons name={expanded ? 'close' : 'headset-outline'} size={25} color="#FFFFFF" /></Pressable>
+    <Pressable onPress={() => setExpanded(value => !value)} style={[styles.helpMain, expanded && styles.helpMainClose]}><Ionicons name={expanded ? 'close' : 'headset-outline'} size={25} color="#FFFFFF" /></Pressable>
     <Modal visible={contactVisible} transparent animationType="slide" onRequestClose={() => setContactVisible(false)}>
       <Pressable style={styles.helpModalBackdrop} onPress={() => setContactVisible(false)}>
         <Pressable style={styles.helpSheet} onPress={() => {}}>
@@ -471,7 +519,18 @@ function Storefront() {
   const [productReturnScreen, setProductReturnScreen] = useState<ReturnScreen>('home');
   const [cartReturnScreen, setCartReturnScreen] = useState<ReturnScreen>('home');
   const [categoryCollectionReturnScreen, setCategoryCollectionReturnScreen] = useState<'home' | 'categories' | 'offers'>('home');
-  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
+  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
+  const [remoteSearchProducts, setRemoteSearchProducts] = useState<Product[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false);
+  const [searchHasNextPage, setSearchHasNextPage] = useState(false);
+  const [searchCursor, setSearchCursor] = useState<string | null>(null);
+  const [searchStockFilter, setSearchStockFilter] = useState<'All' | 'In stock' | 'Out of stock'>('All');
+  const [searchSort, setSearchSort] = useState<'Recommended' | 'Price: Low' | 'Price: High' | 'Name'>('Recommended');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [selectedHistoryOrder, setSelectedHistoryOrder] = useState<HistoryOrder | null>(null);
   const [orderDetailMode, setOrderDetailMode] = useState<'tracking' | 'return' | null>(null);
   const [orderDetailLoading, setOrderDetailLoading] = useState(false);
@@ -519,6 +578,7 @@ function Storefront() {
       if (screen === 'categoryCollection') { setScreen(categoryCollectionReturnScreen); return true; }
       if (screen === 'collection') { setScreen('home'); return true; }
       if (screen === 'wishlist') { setScreen('home'); return true; }
+      if (screen === 'search') { setScreen('home'); return true; }
       if (screen === 'offers') { setScreen('home'); return true; }
       if (screen === 'orders') { setScreen('home'); return true; }
       if (screen === 'profile') { setScreen('home'); return true; }
@@ -530,6 +590,12 @@ function Storefront() {
   const browseChromeCollapsedRef = useRef(false);
   const browseChromeProgress = useRef(new Animated.Value(0)).current;
   const collapseBrowseChrome = screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile';
+  const storefrontHeaderVisible = collapseBrowseChrome
+    && screen !== 'profile'
+    && !openingAnimationVisible
+    && !customerAuth.loading
+    && (customerAuth.isLoggedIn || initialLoginSkipped)
+    && !checkoutLoginRequired;
   const transportProgress = useRef(new Animated.Value(0)).current;
   const openingProgress = useRef(new Animated.Value(0)).current;
   const flightTrailScale = transportProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 1] });
@@ -541,15 +607,18 @@ function Storefront() {
   const flightTranslateX = Animated.subtract(Animated.multiply(flightTrailScale, contentWidth), 19);
   const truckTranslateX = Animated.subtract(Animated.multiply(truckTrailScale, contentWidth), 21);
   const openingFlightTranslateX = openingProgress.interpolate({
-    inputRange: [0, 0.6, 1],
-    outputRange: [-180, contentWidth + 180, contentWidth + 180],
+    inputRange: [0, 0.06, 0.1, 0.14, 0.18, 0.22, 0.26, 1],
+    outputRange: [-90, -90, -80, -48, 0, 48, 90, 90],
   });
   const openingTruckTranslateX = openingProgress.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [-180, -180, contentWidth + 180],
+    inputRange: [0, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 1],
+    outputRange: [-90, -90, -80, -48, 0, 48, 90, 90],
   });
-  const openingFlightOpacity = openingProgress.interpolate({ inputRange: [0, 0.59, 0.62, 1], outputRange: [0.5, 0.5, 0, 0] });
-  const openingTruckOpacity = openingProgress.interpolate({ inputRange: [0, 0.38, 0.4, 1], outputRange: [0, 0, 0.5, 0.5] });
+  const openingFlightOpacity = openingProgress.interpolate({ inputRange: [0, 0.04, 0.09, 0.22, 0.27, 1], outputRange: [0, 0, 1, 1, 0, 0] });
+  const openingTruckOpacity = openingProgress.interpolate({ inputRange: [0, 0.26, 0.31, 0.44, 0.49, 1], outputRange: [0, 0, 1, 1, 0, 0] });
+  const openingClosedBoxOpacity = openingProgress.interpolate({ inputRange: [0, 0.44, 0.5, 0.64, 0.72, 1], outputRange: [0, 0, 1, 1, 0, 0] });
+  const openingOpenBoxOpacity = openingProgress.interpolate({ inputRange: [0, 0.64, 0.72, 1], outputRange: [0, 0, 1, 1] });
+  const openingBoxLift = openingProgress.interpolate({ inputRange: [0, 0.64, 0.76, 1], outputRange: [3, 3, -4, -4] });
   const homeHeaderHeight = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') ? 126 : 82, 0] });
   const homeHeaderOpacity = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const homeFooterTranslateY = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 74] });
@@ -571,6 +640,74 @@ function Storefront() {
   const cartCount = useMemo(() => cartItems.reduce((total, item) => total + item.quantity, 0), [cartItems]);
   const recommendations = useMemo(() => catalog.slice(0, 4), [catalog]);
   const wishlistProducts = useMemo(() => Object.values(favoriteProducts), [favoriteProducts]);
+  const localSearchMatches = useMemo(() => {
+    const keywords = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return keywords.length ? shopifyProducts.filter(product => keywords.every(keyword => `${product.name} ${product.sku ?? ''}`.toLowerCase().includes(keyword))) : [];
+  }, [searchQuery, shopifyProducts]);
+  const searchMatches = remoteSearchProducts.length ? remoteSearchProducts : localSearchMatches;
+  const displayedSearchResults = useMemo(() => {
+    const filtered = remoteSearchProducts.filter(product => searchStockFilter === 'All' || (searchStockFilter === 'In stock' ? product.availableForSale !== false : product.availableForSale === false));
+    if (searchSort === 'Price: Low') filtered.sort((a, b) => (a.unitPrice ?? 0) - (b.unitPrice ?? 0));
+    if (searchSort === 'Price: High') filtered.sort((a, b) => (b.unitPrice ?? 0) - (a.unitPrice ?? 0));
+    if (searchSort === 'Name') filtered.sort((a, b) => a.name.localeCompare(b.name));
+    return filtered;
+  }, [remoteSearchProducts, searchSort, searchStockFilter]);
+  const submitSearch = () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+    setSubmittedSearch(query);
+    setScreen('search');
+    setSearchLoading(true);
+    setSearchError(null);
+    searchShopifyProducts(query, 30).then(page => {
+      setRemoteSearchProducts(page.products.map(mapShopifyProduct));
+      setSearchHasNextPage(page.hasNextPage);
+      setSearchCursor(page.endCursor);
+    }).catch(error => setSearchError(error instanceof Error ? error.message : 'Search failed.')).finally(() => setSearchLoading(false));
+  };
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (screen !== 'home') return;
+    if (!query) { setRemoteSearchProducts([]); setSearchLoading(false); setSearchError(null); setSearchHasNextPage(false); setSearchCursor(null); return; }
+    let cancelled = false;
+    setSearchLoading(true);
+    setSearchError(null);
+    setRemoteSearchProducts([]);
+    setSearchHasNextPage(false);
+    setSearchCursor(null);
+    const timer = setTimeout(() => {
+      searchShopifyProducts(query, 2).then(page => {
+        if (!cancelled) {
+          setRemoteSearchProducts(page.products.map(mapShopifyProduct));
+          setSearchHasNextPage(page.hasNextPage);
+          setSearchCursor(page.endCursor);
+        }
+      }).catch(error => {
+        if (!cancelled) { setRemoteSearchProducts([]); setSearchError(error instanceof Error ? error.message : 'Search failed.'); }
+      }).finally(() => { if (!cancelled) setSearchLoading(false); });
+    }, 60);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [screen, searchQuery]);
+
+  const loadMoreSearchResults = () => {
+    if (!submittedSearch || !searchHasNextPage || !searchCursor || searchLoadingMore) return;
+    setSearchLoadingMore(true);
+    searchShopifyProducts(submittedSearch, 30, searchCursor).then(page => {
+      setRemoteSearchProducts(current => {
+        const ids = new Set(current.map(product => product.id));
+        return [...current, ...page.products.map(mapShopifyProduct).filter(product => !ids.has(product.id))];
+      });
+      setSearchHasNextPage(page.hasNextPage);
+      setSearchCursor(page.endCursor);
+    }).catch(error => setSearchError(error instanceof Error ? error.message : 'Unable to load more results.')).finally(() => setSearchLoadingMore(false));
+  };
+
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { shown.remove(); hidden.remove(); };
+  }, []);
   const filteredShopifyMenuItems = useMemo(
     () => shopifyMenuItems.filter(item => !excludedShopifyMenuItems.has(item.title.trim())),
     [shopifyMenuItems],
@@ -590,12 +727,11 @@ function Storefront() {
       return collectionItems.length
         ? collectionItems.map(({ collection, group }, index) => {
           const preview = collection.resource ? shopifyCollectionPreviews[collection.resource.id] : undefined;
-          const firstProductImage = preview?.products.nodes[0]?.images.nodes[0]?.url;
           const collectionImage = preview?.image?.url;
           return {
             id: collection.id,
             label: collection.title.trim(),
-            image: collectionImage ? { uri: collectionImage } as ImageSourcePropType : firstProductImage ? { uri: firstProductImage } as ImageSourcePropType : shopCategoryImages[(index + categoryIndex * 2) % shopCategoryImages.length]!,
+            image: collectionImage ? { uri: collectionImage } as ImageSourcePropType : undefined,
             collection,
             group,
           };
@@ -678,28 +814,37 @@ function Storefront() {
   }, [catalog]);
 
   useEffect(() => {
-    if (screen !== 'home' && screen !== 'categories') return;
+    if (!storefrontHeaderVisible) {
+      transportProgress.stopAnimation();
+      transportProgress.setValue(0);
+      return;
+    }
     transportProgress.setValue(0);
     const transportAnimation = Animated.loop(Animated.timing(transportProgress, {
       toValue: 1,
-      duration: 5000,
+      duration: 3000,
       easing: Easing.linear,
       useNativeDriver: true,
     }));
     transportAnimation.start();
     return () => transportAnimation.stop();
-  }, [contentWidth, screen, transportProgress]);
+  }, [contentWidth, storefrontHeaderVisible, transportProgress]);
 
   useEffect(() => {
     browseChromeCollapsedRef.current = false;
+    browseChromeProgress.stopAnimation();
     browseChromeProgress.setValue(0);
   }, [browseChromeProgress, collapseBrowseChrome, screen]);
+
+  useEffect(() => {
+    if (screen === 'home' && !keyboardVisible) setSearchQuery('');
+  }, [keyboardVisible, screen]);
 
   useEffect(() => {
     openingProgress.setValue(0);
     const openingAnimation = Animated.timing(openingProgress, {
       toValue: 1,
-      duration: 5200,
+      duration: 5000,
       easing: Easing.linear,
       useNativeDriver: true,
     });
@@ -863,7 +1008,7 @@ function Storefront() {
 
   const openProduct = (product: Product, preferredCollectionId?: string) => {
     setRecentlyViewed(current => [product, ...current.filter(item => item.id !== product.id)].slice(0, 10));
-    setProductReturnScreen(screen === 'product' || screen === 'collection' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'cart' ? screen : 'home');
+    setProductReturnScreen(screen === 'product' || screen === 'collection' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'cart' ? screen : 'home');
     setSelectedProduct(product);
     setScreen('product');
     const collectionId = preferredCollectionId ?? product.collectionIds?.[0];
@@ -995,8 +1140,28 @@ function Storefront() {
 
   if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><AddressPage onBack={() => setScreen('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></SafeAreaView>;
 
+  if (screen === 'search') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
+    <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
+    <View style={styles.searchResultsHeader}><Pressable onPress={() => setScreen('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color="#FFFFFF" /></Pressable><View style={styles.searchResultsHeaderCopy}><Text style={styles.searchResultsHeaderTitle}>Search Results</Text><Text style={styles.searchResultsHeaderSubtitle}>Results for “{submittedSearch}”</Text></View><View style={{ width: 24 }} /></View>
+    <ScrollView style={styles.searchResultsPage} contentContainerStyle={styles.searchResultsContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.wishlistHeadingBlock}><Text style={styles.wishlistHeading}>Search Results</Text><Text style={styles.wishlistCount}>{displayedSearchResults.length} products</Text></View>
+      <View style={styles.searchControls}><Pressable onPress={() => setSearchStockFilter(current => current === 'All' ? 'In stock' : current === 'In stock' ? 'Out of stock' : 'All')} style={[styles.searchControl, searchStockFilter !== 'All' && styles.searchControlActive]}><Ionicons name="options-outline" size={18} color={searchStockFilter !== 'All' ? '#FFFFFF' : palette.ink} /><Text numberOfLines={1} style={[styles.searchControlText, searchStockFilter !== 'All' && styles.searchControlTextActive]}>Filter: {searchStockFilter}</Text></Pressable><Pressable onPress={() => setSearchSort(current => current === 'Recommended' ? 'Price: Low' : current === 'Price: Low' ? 'Price: High' : current === 'Price: High' ? 'Name' : 'Recommended')} style={styles.searchControl}><Ionicons name="swap-vertical" size={18} color={palette.ink} /><Text numberOfLines={1} style={styles.searchControlText}>Sort: {searchSort}</Text></Pressable></View>
+      {searchLoading ? <View style={styles.wishlistEmpty}><ActivityIndicator size="large" color={palette.blue} /><Text style={styles.wishlistEmptyCopy}>Searching products…</Text></View> : searchError ? <View style={styles.wishlistEmpty}><Ionicons name="cloud-offline-outline" size={52} color={palette.red} /><Text style={styles.wishlistEmptyTitle}>Search failed</Text><Text style={styles.wishlistEmptyCopy}>{searchError}</Text></View> : displayedSearchResults.length ? <View style={styles.searchResultList}>{displayedSearchResults.map(item => <Pressable key={`search-${item.id}`} onPress={() => openProduct(item)} style={styles.searchResultRow}><Image source={item.image} style={styles.searchResultImage} resizeMode="contain" /><View style={styles.searchResultCopy}><Text numberOfLines={2} style={styles.searchResultTitle}>{item.name}</Text><Text style={styles.searchResultPrice}>{item.price}</Text></View><Ionicons name="chevron-forward" size={20} color={palette.blue} /></Pressable>)}{searchHasNextPage ? <Pressable disabled={searchLoadingMore} onPress={loadMoreSearchResults} style={[styles.searchLoadMore, searchLoadingMore && styles.searchLoadMoreDisabled]}>{searchLoadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.searchLoadMoreText}>Load more</Text>}</Pressable> : null}</View> : <View style={styles.wishlistEmpty}><Ionicons name="search-outline" size={52} color={palette.blue} /><Text style={styles.wishlistEmptyTitle}>No matching products</Text><Text style={styles.wishlistEmptyCopy}>Try another stock filter or keyword.</Text></View>}
+    </ScrollView>
+  </SafeAreaView>;
+
+  if (screen === 'profile') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
+    <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
+    <View style={styles.profileHeader}>
+      <Pressable onPress={() => setScreen('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable>
+      <View style={styles.profileHeaderCopy}><Text style={styles.profileHeaderTitle}>My Profile</Text><Text style={styles.profileHeaderSubtitle}>Account, support and policies</Text></View>
+      <View style={styles.profileHeaderSpacer} />
+    </View>
+    <ProfilePage customer={customerAuth.customer} onLogout={() => { void customerAuth.logout(); setInitialLoginSkipped(false); setCheckoutLoginRequired(false); setScreen('home'); }} />
+  </SafeAreaView>;
+
   return (
-    <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile') && styles.homeSafeArea]}>
+    <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
       <View style={[styles.app, { width: contentWidth }]}>
         {screen === 'collection' ? <View style={styles.collectionHeader}>
@@ -1024,10 +1189,10 @@ function Storefront() {
           <View style={styles.deliveryActions}><Pressable onPress={() => setScreen('profile')}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
         </View>}
 
-        {(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile') && <View style={[styles.staticSearchZone, styles.homeHeroSurface]}>
+        {screen === 'home' && <View style={[styles.staticSearchZone, styles.homeHeroSurface]}>
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={20} color={palette.ink} />
-            <TextInput placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
+            <TextInput value={searchQuery} onChangeText={setSearchQuery} onFocus={() => setKeyboardVisible(true)} onBlur={() => setKeyboardVisible(false)} onSubmitEditing={submitSearch} returnKeyType="search" placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
           </View>
         </View>}
 
@@ -1106,7 +1271,7 @@ function Storefront() {
                 setScreen('collection');
               }
             }}>
-              <View style={styles.shopCategoryImageBlock}><View style={styles.shopCategoryImageClip}><Image source={image} style={styles.shopCategoryImage} resizeMode="contain" /></View></View>
+              <View style={styles.shopCategoryImageBlock}><View style={styles.shopCategoryImageClip}><CollectionArtwork source={image} /></View></View>
               <Text numberOfLines={2} style={styles.shopCategoryLabel}>{label}</Text>
             </Pressable>)}
           </View>
@@ -1120,7 +1285,7 @@ function Storefront() {
           </ScrollView>
           </View>
 
-          </> : screen === 'profile' ? <ProfilePage customer={customerAuth.customer} onLogout={() => { void customerAuth.logout(); setInitialLoginSkipped(false); setCheckoutLoginRequired(false); setScreen('home'); }} /> : screen === 'orders' ? <View style={styles.ordersPage}>
+          </> : screen === 'orders' ? <View style={styles.ordersPage}>
             <View style={styles.ordersHeadingBlock}>
               <Text style={styles.ordersHeading}>Order History</Text>
             </View>
@@ -1201,7 +1366,8 @@ function Storefront() {
             </View>
           </>}
         </Animated.ScrollView>
-        <Animated.View style={[styles.floatingFooter, collapseBrowseChrome && { opacity: homeFooterOpacity, transform: [{ translateY: homeFooterTranslateY }] }]}>
+        {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><ActivityIndicator size="small" color={palette.blue} /><Text style={styles.searchNoSuggestions}>Searching…</Text></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
+        <Animated.View style={[styles.floatingFooter, collapseBrowseChrome && { opacity: homeFooterOpacity, transform: [{ translateY: homeFooterTranslateY }] }]}> 
           <Pressable onPress={() => setScreen('home')} style={[styles.footerTab, (screen === 'home' || screen === 'collection') && styles.footerTabSelected]}>
             <Ionicons name={screen === 'home' ? 'home' : 'home-outline'} size={25} color={screen === 'home' ? palette.blue : palette.muted} />
             <Text style={[styles.footerTabText, screen === 'home' && styles.footerTabActive]}>Home</Text>
@@ -1276,19 +1442,17 @@ function Storefront() {
       <HelpFab cartBottom={floatingCartBottom} />
       {collapseBrowseChrome ? <View pointerEvents="none" style={[styles.bottomSafeFill, { height: insets.bottom }]} /> : null}
       {openingAnimationVisible ? <View pointerEvents="none" style={styles.openingAnimationOverlay}>
-        <Text style={styles.openingAnimationMessage}>Discover world‑class products, curated for you.</Text>
-        {[
-          { top: '10%', left: -80, size: 42 }, { top: '23%', left: 20, size: 50 }, { top: '37%', left: -25, size: 39 },
-          { top: '58%', left: 55, size: 47 }, { top: '72%', left: -55, size: 44 }, { top: '86%', left: 10, size: 51 },
-        ].map((vehicle, index) => <Animated.View key={`opening-flight-${index}`} style={[styles.openingVehicle, { top: vehicle.top as `${number}%`, left: vehicle.left, opacity: openingFlightOpacity, transform: [{ translateX: openingFlightTranslateX }] }]}>
-          <Ionicons name="airplane" size={vehicle.size} color={palette.blue} />
-        </Animated.View>)}
-        {[
-          { top: '13%', left: 35, size: 48 }, { top: '28%', left: -65, size: 43 }, { top: '43%', left: 5, size: 52 },
-          { top: '61%', left: -20, size: 45 }, { top: '76%', left: 65, size: 50 }, { top: '89%', left: -70, size: 46 },
-        ].map((vehicle, index) => <Animated.View key={`opening-truck-${index}`} style={[styles.openingVehicle, { top: vehicle.top as `${number}%`, left: vehicle.left, opacity: openingTruckOpacity, transform: [{ translateX: openingTruckTranslateX }] }]}>
-          <MaterialCommunityIcons name="truck-fast-outline" size={vehicle.size} color={palette.red} />
-        </Animated.View>)}
+        <View style={styles.openingSequenceGroup}>
+          <View style={styles.openingRoute}>
+            <Animated.View style={[styles.openingSequenceVehicle, { opacity: openingFlightOpacity, transform: [{ translateX: openingFlightTranslateX }] }]}><Ionicons name="airplane" size={42} color={palette.blue} /></Animated.View>
+            <Animated.View style={[styles.openingSequenceVehicle, { opacity: openingTruckOpacity, transform: [{ translateX: openingTruckTranslateX }] }]}><MaterialCommunityIcons name="truck-fast-outline" size={42} color={palette.red} /></Animated.View>
+            <View style={styles.openingBox}>
+              <Animated.View style={[styles.openingCartonIcon, { opacity: openingClosedBoxOpacity }]}><MaterialCommunityIcons name="package-variant-closed" size={42} color="#B97435" /></Animated.View>
+              <Animated.View style={[styles.openingCartonIcon, { opacity: openingOpenBoxOpacity, transform: [{ translateY: openingBoxLift }] }]}><MaterialCommunityIcons name="package-variant" size={42} color="#B97435" /></Animated.View>
+            </View>
+          </View>
+          <Text style={styles.openingAnimationMessage}>All the way from the USA to your doorstep.</Text>
+        </View>
       </View> : null}
     </SafeAreaView>
   );
@@ -1306,10 +1470,19 @@ const styles = StyleSheet.create({
   homeSafeArea: { backgroundColor: '#0A254A' },
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
-  openingAnimationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, overflow: 'hidden', backgroundColor: '#F5F5F5' },
-  openingAnimationMessage: { position: 'absolute', left: 24, right: 24, top: '45%', zIndex: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 23, lineHeight: 31, fontWeight: '800', textAlign: 'center' },
+  openingAnimationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, overflow: 'hidden', alignItems: 'center', backgroundColor: '#0A254A' },
+  openingSequenceGroup: { position: 'absolute', top: '50%', left: 0, right: 0, marginTop: -67, height: 134, alignItems: 'center', justifyContent: 'center' },
+  openingRoute: { width: 260, height: 70, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  openingSequenceVehicle: { position: 'absolute' },
+  openingBox: { position: 'absolute', width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  openingAnimationMessage: { marginTop: 12, paddingHorizontal: 24, color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 24, fontStyle: 'italic', textAlign: 'center' },
   openingVehicle: { position: 'absolute' },
   homeCollapsibleHeader: { overflow: 'hidden', backgroundColor: '#0A254A' },
+  profileHeader: { height: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#294565' },
+  profileHeaderCopy: { flex: 1, marginHorizontal: 14 },
+  profileHeaderTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
+  profileHeaderSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
+  profileHeaderSpacer: { width: 24 },
   deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A' },
   transportLane: { height: 44, overflow: 'hidden', position: 'relative', backgroundColor: homeChrome },
   orbitLine: { position: 'absolute', left: 0, right: 0, top: 16, height: 4, borderRadius: 2, backgroundColor: '#C9D2DF' },
@@ -1355,12 +1528,42 @@ const styles = StyleSheet.create({
   carouselLoading: { height: 238, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A254A' },
   carouselLoadingText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
   cartonLoader: { width: 66, height: 58, alignItems: 'center', justifyContent: 'flex-end' },
+  openingCarton: { width: 46, height: 46 },
+  openingCartonIcon: { position: 'absolute', left: 0, top: 0 },
   zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: homeChrome },
   bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: homeChrome },
   zigzagTooth: { width: 16, height: 16, marginHorizontal: 1, marginTop: 6, backgroundColor: palette.white, transform: [{ rotate: '45deg' }] },
-  staticSearchZone: { paddingTop: 0, paddingBottom: 8, backgroundColor: homeChrome },
+  staticSearchZone: { paddingTop: 0, paddingBottom: 8, overflow: 'visible', backgroundColor: homeChrome, zIndex: 100, elevation: 20 },
   searchBox: { height: 50, marginHorizontal: 16, borderWidth: 1, borderColor: '#AEB7C3', borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
   searchInput: { flex: 1, padding: 0, fontFamily: 'Inter_400Regular', fontSize: 12, color: palette.ink },
+  searchSuggestions: { position: 'absolute', left: 28, right: 28, top: 174, overflow: 'hidden', zIndex: 500, borderWidth: 1, borderColor: '#D5DBE3', borderRadius: 10, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 50 },
+  searchSuggestionLoading: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  searchSuggestion: { minHeight: 62, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E3E7EC' },
+  searchSuggestionImage: { width: 46, height: 46, borderRadius: 7, backgroundColor: '#F7F8FA' },
+  searchSuggestionCopy: { flex: 1, marginHorizontal: 10 },
+  searchSuggestionName: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
+  searchSuggestionPrice: { marginTop: 3, color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '900' },
+  searchNoSuggestions: { padding: 16, color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center' },
+  searchResultsHeader: { height: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: '#0A254A', borderBottomWidth: 1, borderBottomColor: '#294565' },
+  searchResultsHeaderCopy: { flex: 1, marginHorizontal: 14 },
+  searchResultsHeaderTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
+  searchResultsHeaderSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
+  searchResultsPage: { flex: 1, backgroundColor: '#FFFFFF' },
+  searchResultsContent: { paddingBottom: 28 },
+  searchControls: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
+  searchControl: { flex: 1, height: 42, minWidth: 0, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: '#D5DBE3', borderRadius: 10, backgroundColor: '#FFFFFF' },
+  searchControlActive: { borderColor: palette.blue, backgroundColor: palette.blue },
+  searchControlText: { flexShrink: 1, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '800' },
+  searchControlTextActive: { color: '#FFFFFF' },
+  searchResultList: { paddingHorizontal: 14, paddingBottom: 24 },
+  searchResultRow: { minHeight: 94, paddingVertical: 10, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#E5E8EC', backgroundColor: '#FFFFFF' },
+  searchResultImage: { width: 72, height: 72, borderRadius: 9, backgroundColor: '#F7F8FA' },
+  searchResultCopy: { flex: 1, marginHorizontal: 12 },
+  searchResultTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 19, fontWeight: '800' },
+  searchResultPrice: { marginTop: 6, color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
+  searchLoadMore: { width: 150, height: 44, marginTop: 20, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: palette.blue },
+  searchLoadMoreDisabled: { opacity: 0.6 },
+  searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
   blinkTabs: { gap: 3, paddingTop: 12, paddingHorizontal: 10, alignItems: 'flex-start', backgroundColor: 'transparent' },
   blinkTab: { width: 78, height: 72, borderBottomWidth: 2, borderBottomColor: '#000000', borderRadius: 10, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 7, backgroundColor: 'transparent' },
   blinkTabGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 9 },
@@ -1386,6 +1589,8 @@ const styles = StyleSheet.create({
   shopCategoryImageBlock: { width: '100%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 3 },
   shopCategoryImageClip: { width: '100%', height: '100%', borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   shopCategoryImage: { width: '100%', height: '100%', borderRadius: 12, transform: [{ scale: 1.24 }] },
+  collectionArtwork: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  collectionArtworkHidden: { position: 'absolute', opacity: 0.01 },
   shopCategoryLabel: { minHeight: 30, marginTop: 7, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
   exploreCard: { width: 130, height: 180, borderRadius: 12, overflow: 'hidden', backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border },
   trendingCard: { flex: 1, width: undefined },
@@ -1410,7 +1615,7 @@ const styles = StyleSheet.create({
   productCard: { marginBottom: 15 },
   collectionProductCard: { marginBottom: 0 },
   collectionProductVisual: { width: '100%', aspectRatio: 0.92, borderWidth: 1, borderColor: '#E7E7E7', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  collectionProductImage: { width: '94%', height: '94%' },
+  collectionProductImage: { position: 'absolute', width: '94%', height: '94%' },
   collectionUnavailable: { opacity: 0.45 },
   collectionDiscountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
   collectionDiscountText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
@@ -1428,7 +1633,7 @@ const styles = StyleSheet.create({
   collectionOldPrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
   productRow: { gap: 5 },
   productVisual: { height: 109, borderRadius: 6, backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border, justifyContent: 'center', alignItems: 'center' },
-  productImage: { width: '80%', height: '88%' },
+  productImage: { position: 'absolute', width: '80%', height: '88%' },
   heart: { position: 'absolute', right: 6, top: 5 },
   productName: { marginTop: 7, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '800', color: palette.ink },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
@@ -1550,13 +1755,16 @@ const styles = StyleSheet.create({
   wishlistCard: { padding: 9, borderWidth: 1, borderColor: '#E3E7EC', borderRadius: 14, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.09, shadowRadius: 5, elevation: 3 },
   wishlistProductLink: { flex: 1 },
   wishlistImageFrame: { width: '100%', aspectRatio: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F8FA' },
+  wishlistDiscountBadge: { position: 'absolute', top: 7, left: 7, minHeight: 23, paddingHorizontal: 7, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
+  wishlistDiscountBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '900' },
   wishlistImage: { width: '91%', height: '91%' },
   wishlistTitle: { minHeight: 38, marginTop: 9, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '800' },
-  wishlistPriceRow: { minHeight: 22, marginTop: 5, flexDirection: 'row', alignItems: 'baseline', columnGap: 4 },
-  wishlistPrice: { flexShrink: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '900' },
-  wishlistOldPrice: { flexShrink: 1, color: '#777777', fontFamily: 'Inter_400Regular', fontSize: 9, textDecorationLine: 'line-through' },
+  wishlistPriceRow: { width: '100%', minHeight: 20, marginTop: 5, overflow: 'hidden', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'baseline', columnGap: 3 },
+  wishlistPrice: { flexShrink: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  wishlistOldPrice: { flexShrink: 1, color: '#777777', fontFamily: 'Inter_400Regular', fontSize: 8, textDecorationLine: 'line-through' },
   wishlistDiscount: { flexShrink: 1, color: palette.green, fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '800' },
   wishlistAddButton: { height: 38, marginTop: 9, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: palette.blue },
+  wishlistNotifyButton: { backgroundColor: '#B98725' },
   wishlistAddText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   wishlistRemoveButton: { height: 35, marginTop: 7, borderWidth: 1, borderColor: '#F0B9B7', borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#FFF6F5' },
   wishlistRemoveText: { color: palette.red, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
@@ -1591,6 +1799,7 @@ const styles = StyleSheet.create({
   helpLayer: { position: 'absolute', right: 14, zIndex: 70, alignItems: 'flex-end' },
   helpActions: { gap: 8, marginBottom: 9, alignItems: 'center' },
   helpMain: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#57BE65', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 },
+  helpMainClose: { backgroundColor: '#E53935' },
   helpAction: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#57BE65', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 4, elevation: 3 },
   helpModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.42)' },
   helpSheet: { padding: 18, paddingBottom: 28, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: '#FFFFFF' },
@@ -1695,6 +1904,21 @@ const styles = StyleSheet.create({
   specDetailCell: { flex: 1, padding: 10, justifyContent: 'center', backgroundColor: '#FFFFFF' },
   specHeadingText: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, fontWeight: '800' },
   specDetailText: { color: '#4D5562', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17 },
+  reviewSection: { marginHorizontal: 14, marginTop: 18, padding: 14, borderWidth: 1, borderColor: '#DFE4EA', borderRadius: 12, backgroundColor: '#FFFFFF' },
+  reviewHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewHeading: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
+  reviewSummary: { marginTop: 4, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
+  reviewPrompt: { marginTop: 18, marginBottom: 8, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
+  reviewStars: { flexDirection: 'row', gap: 8, marginBottom: 13 },
+  reviewInput: { minHeight: 96, padding: 11, borderWidth: 1, borderColor: '#D7DCE3', borderRadius: 9, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 13, backgroundColor: '#FAFBFC' },
+  reviewSubmit: { height: 42, marginTop: 10, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  reviewSubmitText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
+  reviewListHeading: { marginTop: 22, marginBottom: 3, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '900' },
+  productReviewCard: { paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DFE4EA' },
+  reviewCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  reviewName: { flex: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  reviewCardRating: { color: '#F2A900', fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 1 },
+  reviewBody: { marginTop: 7, color: '#596575', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18 },
   similarTitle: { marginHorizontal: 14, marginTop: 24, fontFamily: 'Inter_400Regular', fontSize: 20, fontWeight: '900' },
   similarSubtitle: { marginHorizontal: 14, marginTop: 4, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 12 },
   detailRecommendations: { gap: 12, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 0 },
