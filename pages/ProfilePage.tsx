@@ -474,7 +474,7 @@ const s = StyleSheet.create({
   modalCancelText: { color: '#536071', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '800' },
   modalSave: { flex: 1.4, height: 46, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5' },
   modalSaveText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  footer: { height: 66, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#D5DBE3', backgroundColor: '#E9EDF2' },
+  footer: { height: 66, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#D5DBE3', backgroundColor: '#F5F5F5' },
   logoutButton: { minWidth: 132, height: 42, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 9, backgroundColor: '#3F72E5' },
   logoutButtonDisabled: { opacity: 0.42 },
   logoutButtonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },

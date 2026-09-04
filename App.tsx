@@ -57,7 +57,7 @@ const FLOATING_CART_HEIGHT = 58;
 const FLOATING_CONTROL_GAP = 12;
 const WISHLIST_ACTIVE_COLOR = '#B85C5C';
 const homeChrome = '#D3DDEA';
-const footerDiscountTag = require('./assets/ui/discount-tag.png');
+const footerDiscountTag = require('./assets/ui/offers.png');
 
 type Product = {
   id: string;
@@ -1748,7 +1748,7 @@ const styles = StyleSheet.create({
   openingCarton: { width: 46, height: 46 },
   openingCartonIcon: { position: 'absolute', left: 0, top: 0 },
   zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: homeChrome },
-  bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: homeChrome },
+  bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: '#F5F5F5' },
   zigzagTooth: { width: 16, height: 16, marginHorizontal: 1, marginTop: 6, backgroundColor: palette.white, transform: [{ rotate: '45deg' }] },
   staticSearchZone: { paddingTop: 0, paddingBottom: 8, overflow: 'visible', backgroundColor: homeChrome, zIndex: 100, elevation: 20 },
   searchBox: { height: 50, marginHorizontal: 16, borderWidth: 1, borderColor: '#AEB7C3', borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
@@ -2025,7 +2025,7 @@ const styles = StyleSheet.create({
   collectionBrand: { flex: 1, height: 37, borderRadius: 5, borderWidth: 1, borderColor: '#D7D7D7', alignItems: 'center', justifyContent: 'center' },
   collectionBrandText: { fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '500', color: '#111' },
   jbl: { color: '#E52C22', fontWeight: '900' },
-  floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 70, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: homeChrome, borderTopWidth: 1, borderColor: '#D5DBE3' },
+  floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 70, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderTopWidth: 1, borderColor: '#D5DBE3' },
   cartPopupLayer: { ...StyleSheet.absoluteFillObject, zIndex: 50, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 82 },
   collectionCartPopupLayer: {},
   cartPopup: { width: 174, height: 58, paddingHorizontal: 8, borderRadius: 13, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.blue, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 7 },
@@ -2073,14 +2073,14 @@ const styles = StyleSheet.create({
   emptyCart: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   emptyCartTitle: { marginTop: 14, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
   emptyCartCopy: { marginTop: 6, color: '#697386', fontFamily: 'Inter_400Regular', fontSize: 13 },
-  cartCheckoutBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: homeChrome },
+  cartCheckoutBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5' },
   cartTotalBlock: { flex: 1 },
   cartItemCount: { color: '#697386', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '700' },
   cartTotalText: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '900' },
   cartCheckoutButton: { height: 46, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
   cartCheckoutText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
-  footerTab: { flex: 1, alignSelf: 'stretch', borderTopWidth: 3, borderTopColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#F8F9FB' },
-  footerTabSelected: { borderTopColor: palette.blue, backgroundColor: '#FFFFFF' },
+  footerTab: { flex: 1, alignSelf: 'stretch', borderTopWidth: 3, borderTopColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#F5F5F5' },
+  footerTabSelected: { borderTopColor: palette.blue, backgroundColor: '#F5F5F5' },
   footerTabText: { fontFamily: 'Inter_400Regular', fontSize: 10, color: '#555', fontWeight: '500' },
   footerTabActive: { color: palette.blue, fontWeight: '700' },
   offersFooterTab: { paddingHorizontal: 3 },
@@ -2159,7 +2159,7 @@ const styles = StyleSheet.create({
   similarTitle: { marginHorizontal: 14, marginTop: 24, fontFamily: 'Inter_400Regular', fontSize: 20, fontWeight: '900' },
   similarSubtitle: { marginHorizontal: 14, marginTop: 4, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 12 },
   detailRecommendations: { gap: 12, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 0 },
-  buyBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: homeChrome, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3' },
+  buyBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5', borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3' },
   buyBarPrice: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
   buyBarTax: { marginTop: 2, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 10 },
   addLarge: { width: '56%', height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
