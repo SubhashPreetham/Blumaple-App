@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ShopifyCustomer } from '../src/shopifyCustomerAuth';
 import { savedAddresses } from './AddressPage';
@@ -14,6 +14,26 @@ const menu: Array<{ id: Section; label: string; icon: keyof typeof Ionicons.glyp
   { id: 'faq', label: 'FAQ', icon: 'help-circle-outline' },
   { id: 'notifications', label: 'Notification', icon: 'notifications-outline' },
 ];
+
+const faqItems = [
+  ['Is Cash on Delivery (COD) available?', 'COD is available only on INDIA warehouse products. Online payment is required for USA warehouse products, as they involve importing.'],
+  ['What are the warranty terms?', 'Warranty terms vary by product and brand. A manufacturer warranty is provided where applicable.'],
+  ['Can I cancel my order after placing it?', 'Orders can be cancelled within 24 hours of purchase. Once the item is shipped internationally, cancellation isn’t possible.'],
+  ['What is the return period?', 'You can request a return within 7 days of receiving your product, provided it is not physically damaged.'],
+  ['Can I negotiate if I buy in bulk?', 'Yes, bulk purchase discounts are available. Please contact our support team at help@blumaple.com'],
+  ['Do I need to pay any custom duties?', 'No, you don’t need to pay any extra custom duties. Blumaple takes care of all customs clearance.'],
+  ['Are there any additional shipping charges?', 'No, it’s free shipping on all orders.'],
+  ['How can I track my order?', 'Enter your Order ID here: ORDER TRACKING'],
+  ['Why does delivery take 10+ business days?', 'We source products directly from global suppliers, and international shipping, customs clearance, and doorstep delivery may take additional time.'],
+  ['Where is Blumaple located?', 'Blumaple is based in Hyderabad, India and operates as an online-only store.'],
+] as const;
+
+type ProfileAddress = { label: string; name: string; lastName: string; email: string; phone: string; company: string; building: string; line: string; city: string; state: string; pincode: string; gstin?: string };
+const emptyAddress: ProfileAddress = { label: 'Home', name: '', lastName: '', email: '', phone: '', company: '', building: '', line: '', city: '', state: 'Telangana', pincode: '' };
+
+function AddressField({ placeholder, value, onChangeText, keyboardType = 'default', maxLength }: { placeholder: string; value: string; onChangeText: (value: string) => void; keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'number-pad'; maxLength?: number }) {
+  return <TextInput style={s.modalField} placeholder={placeholder} placeholderTextColor="#777E89" value={value} onChangeText={onChangeText} keyboardType={keyboardType} maxLength={maxLength} />;
+}
 
 const policyDocuments = [
   {
@@ -234,8 +254,23 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
   const [section, setSection] = useState<Section>('personal');
   const [aboutOpen, setAboutOpen] = useState(true);
   const [openPolicies, setOpenPolicies] = useState<Set<string>>(new Set());
+  const [openFaqs, setOpenFaqs] = useState<Set<string>>(new Set());
+  const [profileAddresses, setProfileAddresses] = useState<ProfileAddress[]>(savedAddresses.map(address => ({ ...address, lastName: '', email: '' })));
+  const [billingAddresses, setBillingAddresses] = useState<ProfileAddress[]>([]);
+  const [addressModal, setAddressModal] = useState<'saved' | 'billing' | null>(null);
+  const [addressForm, setAddressForm] = useState<ProfileAddress>(emptyAddress);
   const [notifications, setNotifications] = useState({ orders: true, offers: true, arrivals: false, whatsapp: true });
   const toggle = (key: keyof typeof notifications) => setNotifications(current => ({ ...current, [key]: !current[key] }));
+  const setAddressValue = (key: keyof ProfileAddress, value: string) => setAddressForm(current => ({ ...current, [key]: value }));
+  const openAddressModal = (kind: 'saved' | 'billing') => { setAddressForm({ ...emptyAddress }); setAddressModal(kind); };
+  const saveProfileAddress = () => {
+    if (addressForm.name.trim().length < 2 || addressForm.phone.length !== 10 || addressForm.building.trim().length < 2 || addressForm.city.trim().length < 2 || addressForm.pincode.length !== 6 || (addressModal === 'billing' && !addressForm.gstin?.trim())) {
+      Alert.alert('Complete your address', `Fill all required ${addressModal === 'billing' ? 'billing' : 'address'} fields.`); return;
+    }
+    const saved = { ...addressForm, label: addressModal === 'billing' ? 'Billing' : addressForm.label || 'Home' };
+    addressModal === 'billing' ? setBillingAddresses(current => [...current, saved]) : setProfileAddresses(current => [...current, saved]);
+    setAddressModal(null);
+  };
 
   return <View style={s.page}>
     <View style={s.layout}>
@@ -257,13 +292,18 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
 
         {section === 'addresses' ? <>
           <Text style={s.sectionTitle}>Saved addresses</Text>
-          {savedAddresses.map(address => <View key={address.label} style={s.addressCard}>
+          {profileAddresses.map((address, index) => <View key={`${address.label}-${index}`} style={s.addressCard}>
             <View style={s.addressHeader}><Text style={s.addressLabel}>{address.label}</Text><Ionicons name="location" size={16} color="#3F72E5" /></View>
             <Text style={s.addressName}>{address.name}</Text>
             <Text style={s.body}>{address.building}, {address.line}</Text>
             <Text style={s.body}>{address.city}, {address.state} – {address.pincode}</Text>
             <Text style={s.body}>+91 {address.phone}</Text>
           </View>)}
+          <Pressable onPress={() => openAddressModal('saved')} style={s.addAddressButton}><Ionicons name="add-circle-outline" size={19} color="#3F72E5" /><Text style={s.addAddressText}>Add address</Text></Pressable>
+          <View style={s.addressSectionDivider} />
+          <Text style={s.sectionTitle}>Billing address</Text>
+          {billingAddresses.map((address, index) => <View key={`billing-${index}`} style={s.addressCard}><View style={s.addressHeader}><Text style={s.addressLabel}>Billing</Text><Ionicons name="business" size={16} color="#3F72E5" /></View><Text style={s.addressName}>{address.company}</Text><Text style={s.gstinValue}>GSTIN: {address.gstin}</Text><Text style={s.body}>{address.building}{address.line ? `, ${address.line}` : ''}</Text><Text style={s.body}>{address.city}, {address.state} – {address.pincode}</Text><Text style={s.body}>+91 {address.phone}</Text></View>)}
+          <Pressable onPress={() => openAddressModal('billing')} style={s.addAddressButton}><Ionicons name="add-circle-outline" size={19} color="#3F72E5" /><Text style={s.addAddressText}>Add billing address</Text></Pressable>
         </> : null}
 
         {section === 'about' ? <>
@@ -342,26 +382,7 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
 
         {section === 'faq' ? <>
           <Text style={s.sectionTitle}>Frequently asked questions</Text>
-          <Text style={s.policyTitle}>Is Cash on Delivery (COD) available?</Text>
-          <Text style={s.body}>COD is available only on INDIA warehouse products. Online payment is required for USA warehouse products, as they involve importing.</Text>
-          <Text style={s.policyTitle}>What are the warranty terms?</Text>
-          <Text style={s.body}>Warranty terms vary by product and brand. A manufacturer warranty is provided where applicable.</Text>
-          <Text style={s.policyTitle}>Can I cancel my order after placing it?</Text>
-          <Text style={s.body}>Orders can be cancelled within 24 hours of purchase. Once the item is shipped internationally, cancellation isn’t possible.</Text>
-          <Text style={s.policyTitle}>What is the return period?</Text>
-          <Text style={s.body}>You can request a return within 7 days of receiving your product, provided it is not physically damaged.</Text>
-          <Text style={s.policyTitle}>Can I negotiate if I buy in bulk?</Text>
-          <Text style={s.body}>Yes, bulk purchase discounts are available. Please contact our support team at help@blumaple.com</Text>
-          <Text style={s.policyTitle}>Do I need to pay any custom duties?</Text>
-          <Text style={s.body}>No, you don’t need to pay any extra custom duties. Blumaple takes care of all customs clearance.</Text>
-          <Text style={s.policyTitle}>Are there any additional shipping charges?</Text>
-          <Text style={s.body}>No, it’s free shipping on all orders.</Text>
-          <Text style={s.policyTitle}>How can I track my order?</Text>
-          <Text style={s.body}>Enter your Order ID here: <Text style={s.inlineLink}>ORDER TRACKING</Text></Text>
-          <Text style={s.policyTitle}>Why does delivery take 10+ business days?</Text>
-          <Text style={s.body}>We source products directly from global suppliers, and international shipping, customs clearance, and doorstep delivery may take additional time.</Text>
-          <Text style={s.policyTitle}>Where is Blumaple located?</Text>
-          <Text style={s.body}>Blumaple is based in Hyderabad, India and operates as an online-only store.</Text>
+          {faqItems.map(([question, answer]) => <View key={question} style={s.faqItem}><Pressable onPress={() => setOpenFaqs(current => { const next = new Set(current); next.has(question) ? next.delete(question) : next.add(question); return next; })} style={s.faqHeader}><Text style={s.faqQuestion}>{question}</Text><Ionicons name={openFaqs.has(question) ? 'chevron-up' : 'chevron-down'} size={18} color="#3F72E5" /></Pressable>{openFaqs.has(question) ? <Text style={s.faqAnswer}>{answer}</Text> : null}</View>)}
         </> : null}
 
         {section === 'notifications' ? <>
@@ -375,6 +396,7 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
         </> : null}
       </ScrollView>
     </View>
+    <Modal visible={Boolean(addressModal)} transparent animationType="slide" onRequestClose={() => setAddressModal(null)}><Pressable style={s.modalBackdrop} onPress={() => setAddressModal(null)}><Pressable style={s.addressSheet} onPress={() => {}}><View style={s.modalHeading}><Text style={s.modalTitle}>{addressModal === 'billing' ? 'Add billing address' : 'Add saved address'}</Text><Pressable onPress={() => setAddressModal(null)}><Ionicons name="close" size={24} color="#17202B" /></Pressable></View><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={s.modalContent}>{addressModal === 'billing' ? <><AddressField placeholder="GSTIN" value={addressForm.gstin || ''} onChangeText={value => setAddressValue('gstin', value.toUpperCase())} maxLength={15} /><AddressField placeholder="Business name" value={addressForm.company} onChangeText={value => setAddressValue('company', value)} /></> : <><AddressField placeholder="Email or mobile phone number" value={addressForm.email} onChangeText={value => setAddressValue('email', value)} keyboardType="email-address" /><View style={s.modalTwoCol}><AddressField placeholder="First name" value={addressForm.name} onChangeText={value => setAddressValue('name', value)} /><AddressField placeholder="Last name (optional)" value={addressForm.lastName} onChangeText={value => setAddressValue('lastName', value)} /></View><AddressField placeholder="Company (optional)" value={addressForm.company} onChangeText={value => setAddressValue('company', value)} /></>}<AddressField placeholder="Address" value={addressForm.building} onChangeText={value => setAddressValue('building', value)} /><AddressField placeholder="Apartment, suite, etc. (optional)" value={addressForm.line} onChangeText={value => setAddressValue('line', value)} /><AddressField placeholder="City" value={addressForm.city} onChangeText={value => setAddressValue('city', value)} /><AddressField placeholder="State" value={addressForm.state} onChangeText={value => setAddressValue('state', value)} /><AddressField placeholder="PIN code" value={addressForm.pincode} onChangeText={value => setAddressValue('pincode', value)} keyboardType="number-pad" maxLength={6} /><AddressField placeholder="Phone" value={addressForm.phone} onChangeText={value => setAddressValue('phone', value)} keyboardType="phone-pad" maxLength={10} /></ScrollView><View style={s.modalActions}><Pressable onPress={() => setAddressModal(null)} style={s.modalCancel}><Text style={s.modalCancelText}>Cancel</Text></Pressable><Pressable onPress={saveProfileAddress} style={s.modalSave}><Text style={s.modalSaveText}>Save address</Text></Pressable></View></Pressable></Pressable></Modal>
     <View style={s.footer}><Pressable onPress={onLogout} style={s.logoutButton}><Ionicons name="log-out-outline" size={18} color="#FFFFFF" /><Text style={s.logoutButtonText}>Log out</Text></Pressable></View>
   </View>;
 }
