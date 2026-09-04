@@ -92,7 +92,7 @@ type Product = {
 type CartItem = { product: Product; quantity: number };
 type HistoryOrder = { id: string; date: string; products: Product[]; amount: string; status: 'Delivered' | 'Shipped' | 'Processing' | 'Cancelled' | 'Returned'; deliveredAt?: string; shippingAddress: string };
 type OrderOutcome = { success: boolean; orderId?: string; items: CartItem[]; paymentMethod: 'online' | 'cod'; total: number; tax: number; codFee: number };
-type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'product' | 'cart';
+type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'product' | 'cart';
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
@@ -139,15 +139,6 @@ const homeMenus = [
 ] as const;
 
 const excludedShopifyMenuItems = new Set(['Express Hub', 'Blumaple Business', 'Track Your Order']);
-
-const products: Product[] = [
-  { id: 'akg', name: 'AKG Studio Headphones', price: '₹2,345', oldPrice: '₹3,455', discount: '30% off', image: require('./assets/figma/product-headphones.png') },
-  { id: 'pods', name: 'Wireless Noise Cancelling Buds', price: '₹1,899', oldPrice: '₹2,699', discount: '30% off', image: require('./assets/figma/product-57.png') },
-  { id: 'camera', name: 'Compact Digital Camera', price: '₹6,499', oldPrice: '₹8,499', discount: '24% off', image: require('./assets/figma/product-58.png') },
-  { id: 'watch', name: 'Active Smart Watch', price: '₹2,799', oldPrice: '₹3,999', discount: '30% off', image: require('./assets/figma/product-59.png') },
-  { id: 'speaker', name: 'Portable Bluetooth Speaker', price: '₹1,499', oldPrice: '₹2,199', discount: '32% off', image: require('./assets/figma/product-60.png') },
-  { id: 'keyboard', name: 'Wireless Compact Keyboard', price: '₹2,099', oldPrice: '₹2,999', discount: '30% off', image: require('./assets/figma/product-61.png') },
-];
 
 function money(amount: string, currencyCode: string) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currencyCode, maximumFractionDigits: 2 }).format(Number(amount));
@@ -351,13 +342,6 @@ function CollectionArtwork({ source }: { source?: ImageSourcePropType }) {
   </View>;
 }
 
-const detailColors = [
-  { name: 'White', image: require('./assets/figma/detail-white.png') },
-  { name: 'Black & Gold', image: require('./assets/figma/detail-black-gold.png') },
-  { name: 'Black', image: require('./assets/figma/detail-black.png') },
-  { name: 'Green', image: require('./assets/figma/detail-green.png') },
-];
-
 function ProductDetail({ width, cartCount, product, recommendations, favoriteIds, onBack, onAdd, onCheckout, onOpenProduct, onFavorite }: { width: number; cartCount: number; product: Product; recommendations: Product[]; favoriteIds: Set<string>; onBack: () => void; onAdd: (product: Product) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onFavorite: (product: Product) => void }) {
   const notifyConfirmation = useNotifyConfirmation();
   const [colorIndex, setColorIndex] = useState(0);
@@ -371,7 +355,7 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
     { id: 'verified-2', name: 'Blumaple customer', rating: 4, text: 'Good product and helpful delivery updates throughout the order.' },
   ]);
   const detailGalleryRef = useRef<ScrollView>(null);
-  const choices = product.images?.length ? product.images.map((image, index) => ({ name: index === 0 ? 'Default' : `View ${index + 1}`, image })) : detailColors;
+  const choices = product.images?.length ? product.images.map((image, index) => ({ name: index === 0 ? 'Default' : `View ${index + 1}`, image })) : [{ name: 'Default', image: product.image }];
   const availableForSale = product.availableForSale ?? true;
   const detailDiscountLabel = product.discount ? `(-${product.discount.replace(/\s*off/i, '')})` : '';
   const vendorName = product.vendor?.trim() ?? '';
@@ -585,7 +569,7 @@ function Storefront() {
   const [productReturnScreen, setProductReturnScreen] = useState<ReturnScreen>('home');
   const [cartReturnScreen, setCartReturnScreen] = useState<ReturnScreen>('home');
   const [categoryCollectionReturnScreen, setCategoryCollectionReturnScreen] = useState<'home' | 'categories' | 'offers'>('home');
-  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
+  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchPlaceholderIndex, setSearchPlaceholderIndex] = useState(0);
   const searchPlaceholderY = useRef(new Animated.Value(0)).current;
@@ -639,6 +623,7 @@ function Storefront() {
   const carouselRef = useRef<ScrollView>(null);
   const carouselPositionRef = useRef(0);
   const orderDetailsScrollRef = useRef<ScrollView>(null);
+  const productRecommendationRequestRef = useRef(0);
 
   useEffect(() => {
     const rotatePlaceholder = () => {
@@ -677,7 +662,6 @@ function Storefront() {
       if (screen === 'cart') { setCartPopupVisible(cartItems.length > 0); setScreen(cartReturnScreen); return true; }
       if (screen === 'product') { setScreen(productReturnScreen); return true; }
       if (screen === 'categoryCollection') { setScreen(categoryCollectionReturnScreen); return true; }
-      if (screen === 'collection') { setScreen('home'); return true; }
       if (screen === 'wishlist') { setScreen('home'); return true; }
       if (screen === 'search') { setScreen('home'); return true; }
       if (screen === 'offers') { setScreen('home'); return true; }
@@ -782,7 +766,7 @@ function Storefront() {
       useNativeDriver: true,
     }).start();
   };
-  const catalog = shopifyProducts.length ? shopifyProducts : products;
+  const catalog = shopifyProducts;
   const cartCount = useMemo(() => cartItems.reduce((total, item) => total + item.quantity, 0), [cartItems]);
   const recommendations = useMemo(() => catalog.slice(0, 4), [catalog]);
   const wishlistProducts = useMemo(() => Object.values(favoriteProducts), [favoriteProducts]);
@@ -916,28 +900,24 @@ function Storefront() {
     },
     [activeShopifyMenu, catalog, categoryIndex, shopifyCollectionPreviews],
   );
-  const carouselProducts = useMemo(
-    () => Array.from({ length: 4 }, (_, index) => categoryProducts[index % categoryProducts.length] ?? products[0]!),
-    [categoryProducts],
-  );
   const browserCarouselApiUrl = typeof window !== 'undefined' && window.location ? `${window.location.protocol}//${window.location.hostname}:3001/api/carousels` : '';
   const carouselApiUrl = process.env.EXPO_PUBLIC_CAROUSEL_API_URL ?? browserCarouselApiUrl;
   const uploadedSlides = uploadedCarousels[activeHomeMenu.label]?.filter(slide => slide.image) ?? [];
   const carouselSlides = useMemo(() => activeShopifyMenu?.items.length
-    ? activeShopifyMenu.items.map((item, index) => {
+    ? activeShopifyMenu.items.map(item => {
       const preview = item.resource ? shopifyCollectionPreviews[item.resource.id] : undefined;
       const shopifyProduct = preview?.products.nodes[0];
-      const product = shopifyProduct ? mapShopifyProduct(shopifyProduct) : categoryProducts[index % categoryProducts.length] ?? products[0]!;
+      const product = shopifyProduct ? mapShopifyProduct(shopifyProduct) : undefined;
       const collectionImage = preview?.image?.url;
       // Do not use a product image while the collection image is still loading.
       // That visual swap is distracting and makes the carousel look incorrect.
-      return collectionImage ? { id: item.id, image: { uri: collectionImage } as ImageSourcePropType, title: item.title.trim(), subtitle: '', product, category: item } : null;
+      return collectionImage && product ? { id: item.id, image: { uri: collectionImage } as ImageSourcePropType, title: item.title.trim(), subtitle: '', product, category: item } : null;
     })
       .filter((slide): slide is NonNullable<typeof slide> => Boolean(slide))
-    : uploadedSlides.length
-      ? uploadedSlides.map((slide, index) => ({ id: slide.id, image: { uri: slide.image } as ImageSourcePropType, title: slide.title || `${activeHomeMenu.label} picks`, subtitle: slide.collection ? `Shop ${slide.collection}` : `Trending ${activeHomeMenu.label.toLowerCase()} pick`, product: categoryProducts[index % categoryProducts.length] ?? products[0]!, category: undefined }))
+    : uploadedSlides.length && categoryProducts.length
+      ? uploadedSlides.map((slide, index) => ({ id: slide.id, image: { uri: slide.image } as ImageSourcePropType, title: slide.title || `${activeHomeMenu.label} picks`, subtitle: slide.collection ? `Shop ${slide.collection}` : `Trending ${activeHomeMenu.label.toLowerCase()} pick`, product: categoryProducts[index % categoryProducts.length]!, category: undefined }))
       : [],
-  [activeHomeMenu.label, activeShopifyMenu, carouselProducts, categoryProducts, shopifyCollectionPreviews, uploadedSlides]);
+  [activeHomeMenu.label, activeShopifyMenu, categoryProducts, shopifyCollectionPreviews, uploadedSlides]);
   const carouselSlideCount = Math.max(1, carouselSlides.length);
   const offerCollections = carouselSlides.slice(0, 8);
   const historyOrders = useMemo<HistoryOrder[]>(() => {
@@ -1234,7 +1214,7 @@ function Storefront() {
 
   const openCart = () => {
     setCartPopupVisible(false);
-    setCartReturnScreen(screen === 'product' || screen === 'collection' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' ? screen : 'home');
+    setCartReturnScreen(screen === 'product' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' ? screen : 'home');
     setScreen('cart');
   };
 
@@ -1255,19 +1235,24 @@ function Storefront() {
   };
 
   const openProduct = (product: Product, preferredCollectionId?: string) => {
+    const recommendationRequest = ++productRecommendationRequestRef.current;
     setRecentlyViewed(current => [product, ...current.filter(item => item.id !== product.id)].slice(0, 10));
-    setProductReturnScreen(screen === 'product' || screen === 'collection' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'cart' ? screen : 'home');
+    if (screen !== 'product') setProductReturnScreen(screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'cart' ? screen : 'home');
     setSelectedProduct(product);
     setScreen('product');
     const collectionId = preferredCollectionId ?? product.collectionIds?.[0];
     if (!collectionId) {
-      setProductPageRecommendations([]);
+      setProductPageRecommendations(shopifyProducts.filter(item => item.id !== product.id));
       return;
     }
     setProductPageRecommendations([product]);
     fetchShopifyCollectionProducts(collectionId, 250)
-      .then(page => setProductPageRecommendations(page.products.map(mapShopifyProduct)))
-      .catch(() => setProductPageRecommendations([]));
+      .then(page => {
+        if (productRecommendationRequestRef.current === recommendationRequest) setProductPageRecommendations(page.products.map(mapShopifyProduct));
+      })
+      .catch(() => {
+        if (productRecommendationRequestRef.current === recommendationRequest) setProductPageRecommendations([]);
+      });
   };
 
   const openCategoryCollection = (category: ShopifyMenuItem, collection: ShopifyMenuItem, origin: 'home' | 'categories' | 'offers') => {
@@ -1409,16 +1394,16 @@ function Storefront() {
   </SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
-    const recommendations = productPageRecommendations.some(item => item.id === selectedProduct.id) ? productPageRecommendations : products;
-    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} favoriteIds={favorites} onBack={() => navigateBack(productReturnScreen)} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); }} onOpenProduct={openProduct} onFavorite={toggleFavorite} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}<HelpFab product={selectedProduct} cartBottom={floatingCartBottom} /></Animated.View></SafeAreaView>;
+    const recommendations = productPageRecommendations;
+    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDetail key={selectedProduct.id} width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} favoriteIds={favorites} onBack={() => navigateBack(productReturnScreen)} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); }} onOpenProduct={openProduct} onFavorite={toggleFavorite} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}<HelpFab product={selectedProduct} cartBottom={floatingCartBottom} /></Animated.View></SafeAreaView>;
   }
 
   if (screen === 'cart') {
     const cartProductIds = new Set(cartItems.map(item => item.product.id));
     const cartCollectionIds = new Set(cartItems.flatMap(item => item.product.collectionIds ?? []));
-    const sameCollectionProducts = products.filter(product => !cartProductIds.has(product.id) && (product.collectionIds ?? []).some(collectionId => cartCollectionIds.has(collectionId)));
+    const sameCollectionProducts = shopifyProducts.filter(product => !cartProductIds.has(product.id) && (product.collectionIds ?? []).some(collectionId => cartCollectionIds.has(collectionId)));
     const trendingProducts = categoryProducts.filter(product => !cartProductIds.has(product.id));
-    const bestSellingProducts = [...products].filter(product => !cartProductIds.has(product.id) && product.availableForSale !== false).sort((a, b) => Number(b.discount.replace(/[^0-9]/g, '')) - Number(a.discount.replace(/[^0-9]/g, '')));
+    const bestSellingProducts = [...shopifyProducts].filter(product => !cartProductIds.has(product.id) && product.availableForSale !== false).sort((a, b) => Number(b.discount.replace(/[^0-9]/g, '')) - Number(a.discount.replace(/[^0-9]/g, '')));
     const seenSuggestionIds = new Set<string>();
     const cartSuggestions = [recentlyViewed, sameCollectionProducts, trendingProducts, bestSellingProducts].flat().filter(product => {
       if (cartProductIds.has(product.id) || seenSuggestionIds.has(product.id)) return false;
@@ -1465,11 +1450,7 @@ function Storefront() {
     <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
       <Animated.View style={[styles.app, activeFooterTab === 'home' && styles.homeEntranceBackground, { width: contentWidth, opacity: Animated.multiply(storefrontEntranceProgress, backRevealOpacity), transform: [{ translateX: backRevealTranslateX }] }]}>
-        {screen === 'collection' ? <View style={styles.collectionHeader}>
-          <Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={19} color={palette.white} /></Pressable>
-          <Text style={styles.collectionHeaderTitle}>AUDIO</Text>
-          <View style={styles.collectionHeaderActions}><Ionicons name="search-outline" size={20} color={palette.white} /><Ionicons name="cart-outline" size={22} color={palette.white} /></View>
-        </View> : collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
+        {collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
           <View style={[styles.deliveryHeader, screen === 'home' && styles.homeHeroSurface]}>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
@@ -1587,8 +1568,6 @@ function Storefront() {
             {shopCategories.map(({ id, label, image, collection, group }) => <Pressable key={id} style={styles.shopCategoryItem} onPress={() => {
               if (collection && group) {
                 openCategoryCollection(group, collection, 'home');
-              } else {
-                setScreen('collection');
               }
             }}>
               <View style={styles.shopCategoryImageBlock}><View style={styles.shopCategoryImageClip}><CollectionArtwork source={image} /></View></View>
@@ -1618,7 +1597,7 @@ function Storefront() {
                 const trackable = isTrackableOrder(order);
                 const returnEligible = isReturnEligibleOrder(order);
                 return <Pressable key={order.id} onPress={() => openHistoryOrder(order)} style={styles.orderRow}>
-                <Image source={order.products[0]?.image ?? products[0]!.image} style={styles.orderImage} resizeMode="contain" />
+                <Image source={order.products[0]?.image ?? require('./assets/figma/product-headphones.png')} style={styles.orderImage} resizeMode="contain" />
                 <View style={styles.orderMain}>
                   <Text style={styles.orderId}>{order.id}</Text>
                   <Text style={styles.orderDate}>{order.date}</Text>
@@ -1663,32 +1642,7 @@ function Storefront() {
             onSelectCollection={(category, collection) => {
               openCategoryCollection(category, collection, 'categories');
             }}
-          /> : <>
-            <View style={styles.audioHubHeading}>
-              <Text style={styles.audioHubTitle}>The Audio Hub</Text>
-              <Text style={styles.audioHubLink}>Explore All Audio Products →</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.collectionCategoryRow}>
-              {[
-                ['Headphones', require('./assets/figma/product-headphones.png')],
-                ['Earbuds', require('./assets/figma/product-57.png')],
-                ['Speakers', require('./assets/figma/product-60.png')],
-                ['Microphones', require('./assets/figma/category-audio.png')],
-                ['VR', require('./assets/figma/category-smart-tech.png')],
-              ].map(([label, image]) => <Pressable key={label as string} style={styles.collectionCategory} onPress={() => setActiveCategory(label as string)}>
-                <Image source={image as ImageSourcePropType} style={styles.collectionCategoryImage} resizeMode="cover" />
-                <Text style={styles.collectionCategoryLabel}>{label as string}</Text>
-              </Pressable>)}
-            </ScrollView>
-            <Image source={require('./assets/figma/banner-audio.png')} style={styles.collectionBanner} resizeMode="cover" />
-            <View style={styles.collectionDots}><View style={styles.collectionDot} /><View style={styles.collectionDot} /><View style={styles.collectionDotActive} /></View>
-            <SectionTitle>Top Brands You'll Love</SectionTitle>
-            <View style={styles.collectionBrandRow}>{['boAt', 'JBL', 'SONY'].map((brand, index) => <View key={brand} style={styles.collectionBrand}><Text style={[styles.collectionBrandText, index === 1 && styles.jbl]}>{brand}</Text></View>)}</View>
-            <SectionTitle>Products worth buying</SectionTitle>
-            <View style={styles.grid}>
-              {[...catalog, ...catalog].slice(0, 6).map((item, index) => <ProductCard key={`collection-${item.id}-${index}`} item={item} width={cardWidth} favorite={favorites.has(item.id)} onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
-            </View>
-          </>}
+          /> : null}
         </Animated.ScrollView>
         {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><RotatingSearchIcon /></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
         <Animated.View style={[styles.floatingFooter, collapseBrowseChrome && { opacity: homeFooterOpacity, transform: [{ translateY: homeFooterTranslateY }] }]}> 
