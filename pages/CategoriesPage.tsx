@@ -11,12 +11,7 @@ type Props = {
 
 function CollectionImage({ imageUrl, loaded }: { imageUrl?: string; loaded: boolean }) {
   const [imageReady, setImageReady] = useState(false);
-  useEffect(() => {
-    let active = true;
-    setImageReady(false);
-    if (imageUrl) Image.prefetch(imageUrl).then(() => { if (active) setImageReady(true); }).catch(() => undefined);
-    return () => { active = false; };
-  }, [imageUrl]);
+  useEffect(() => setImageReady(false), [imageUrl]);
 
   if (!loaded || !imageUrl) return <CartonLoader />;
   return <View style={s.artwork}>
@@ -26,28 +21,32 @@ function CollectionImage({ imageUrl, loaded }: { imageUrl?: string; loaded: bool
 }
 
 function CartonLoader() {
-  const progress = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(progress, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }), Animated.delay(260),
-      Animated.timing(progress, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }), Animated.delay(220),
-    ]));
-    animation.start();
-    return () => animation.stop();
-  }, [progress]);
-  const closed = progress.interpolate({ inputRange: [0, .42, .58, 1], outputRange: [1, 1, 0, 0] });
-  const open = progress.interpolate({ inputRange: [0, .42, .58, 1], outputRange: [0, 0, 1, 1] });
-  const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [2, -4] });
-  return <View accessibilityLabel="Loading collection image" style={s.loaderBox}><Animated.View style={[s.loaderIcon, { opacity: closed }]}><MaterialCommunityIcons name="package-variant-closed" size={26} color="#B97435" /></Animated.View><Animated.View style={[s.loaderIcon, { opacity: open, transform: [{ translateY: lift }] }]}><MaterialCommunityIcons name="package-variant" size={26} color="#B97435" /></Animated.View></View>;
+  return <View accessibilityLabel="Loading collection image" style={s.loaderBox}><MaterialCommunityIcons name="package-variant-closed" size={26} color="#B97435" /></View>;
 }
 
 export function CategoriesPage({ menuItems, previews, onSelectCollection }: Props) {
   const categories = menuItems.flatMap(menu => menu.items);
+  const sectionEntrances = useRef(Array.from({ length: 12 }, () => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const visibleSections = sectionEntrances.slice(0, Math.min(categories.length, sectionEntrances.length));
+    visibleSections.forEach(section => section.setValue(0));
+    const animation = Animated.stagger(55, visibleSections.map(section => Animated.timing(section, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    })));
+    animation.start();
+    return () => animation.stop();
+  }, [categories.length, sectionEntrances]);
 
   return <View style={s.page}>
-    {categories.map(category => {
+    {categories.map((category, categoryIndex) => {
       const collections = category.items.length ? category.items : [category];
-      return <View key={category.id} style={s.categorySection}>
+      const entrance = sectionEntrances[Math.min(categoryIndex, sectionEntrances.length - 1)]!;
+      const translateY = entrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
+      return <Animated.View key={category.id} style={[s.categorySection, { opacity: entrance, transform: [{ translateY }] }]}>
         <Text style={s.categoryTitle}>{category.title.trim()}</Text>
         <View style={s.collectionGrid}>
           {collections.map(collection => {
@@ -61,7 +60,7 @@ export function CategoriesPage({ menuItems, previews, onSelectCollection }: Prop
             </Pressable>;
           })}
         </View>
-      </View>;
+      </Animated.View>;
     })}
   </View>;
 }
@@ -77,6 +76,6 @@ const s = StyleSheet.create({
   image: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
   artwork: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   imageHidden: { position: 'absolute', opacity: 0.01 },
-  loaderBox: { width: 26, height: 26 }, loaderIcon: { position: 'absolute', left: 0, top: 0 },
+  loaderBox: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   collectionLabel: { minHeight: 34, marginTop: 7, color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
 });

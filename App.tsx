@@ -565,6 +565,8 @@ function Storefront() {
   const [openingAnimationVisible, setOpeningAnimationVisible] = useState(true);
   const [initialLoginSkipped, setInitialLoginSkipped] = useState(false);
   const [checkoutLoginRequired, setCheckoutLoginRequired] = useState(false);
+  const [footerPageTransitioning, setFooterPageTransitioning] = useState(false);
+  const [activeFooterTab, setActiveFooterTab] = useState<'home' | 'categories' | 'orders' | 'wishlist' | 'offers'>('home');
   const carouselRef = useRef<ScrollView>(null);
   const carouselPositionRef = useRef(0);
   const orderDetailsScrollRef = useRef<ScrollView>(null);
@@ -589,6 +591,12 @@ function Storefront() {
     });
     return () => subscription.remove();
   }, [cartItems, cartReturnScreen, categoryCollectionReturnScreen, productReturnScreen, screen]);
+
+  useEffect(() => {
+    if (screen === 'home' || screen === 'categories' || screen === 'orders' || screen === 'wishlist' || screen === 'offers') {
+      setActiveFooterTab(screen);
+    }
+  }, [screen]);
   const browseChromeCollapsedRef = useRef(false);
   const browseFooterCollapsedRef = useRef(false);
   const lastBrowseScrollYRef = useRef(0);
@@ -605,6 +613,18 @@ function Storefront() {
     && !checkoutLoginRequired;
   const transportProgress = useRef(new Animated.Value(0)).current;
   const openingProgress = useRef(new Animated.Value(0)).current;
+  const openingFlightProgress = useRef(new Animated.Value(0)).current;
+  const openingTruckProgress = useRef(new Animated.Value(0)).current;
+  const loginEntranceProgress = useRef(new Animated.Value(0)).current;
+  const storefrontEntranceProgress = useRef(new Animated.Value(0)).current;
+  const pincodeModalProgress = useRef(new Animated.Value(0)).current;
+  const profileEntranceProgress = useRef(new Animated.Value(0)).current;
+  const backRevealProgress = useRef(new Animated.Value(1)).current;
+  const homeSearchEntrance = useRef(new Animated.Value(0)).current;
+  const homeCarouselEntrance = useRef(new Animated.Value(0)).current;
+  const homeCategoryEntrance = useRef(new Animated.Value(0)).current;
+  const homeTrendingEntrance = useRef(new Animated.Value(0)).current;
+  const homeBestSellingEntrance = useRef(new Animated.Value(0)).current;
   const flightTrailScale = transportProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 1] });
   const truckTrailScale = transportProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
   const flightPhaseOpacity = transportProgress.interpolate({ inputRange: [0, 0.5, 0.5001, 1], outputRange: [1, 1, 0, 0] });
@@ -613,19 +633,31 @@ function Storefront() {
   const truckTrailOffset = Animated.multiply(Animated.subtract(truckTrailScale, 1), contentWidth / 2);
   const flightTranslateX = Animated.subtract(Animated.multiply(flightTrailScale, contentWidth), 19);
   const truckTranslateX = Animated.subtract(Animated.multiply(truckTrailScale, contentWidth), 21);
-  const openingFlightTranslateX = openingProgress.interpolate({
-    inputRange: [0, 0.06, 0.1, 0.14, 0.18, 0.22, 0.26, 1],
-    outputRange: [-90, -90, -80, -48, 0, 48, 90, 90],
+  const openingFlightTranslateX = openingFlightProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
   });
-  const openingTruckTranslateX = openingProgress.interpolate({
-    inputRange: [0, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 1],
-    outputRange: [-90, -90, -80, -48, 0, 48, 90, 90],
+  const openingTruckTranslateX = openingTruckProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 100],
   });
-  const openingFlightOpacity = openingProgress.interpolate({ inputRange: [0, 0.04, 0.09, 0.22, 0.27, 1], outputRange: [0, 0, 1, 1, 0, 0] });
-  const openingTruckOpacity = openingProgress.interpolate({ inputRange: [0, 0.26, 0.31, 0.44, 0.49, 1], outputRange: [0, 0, 1, 1, 0, 0] });
-  const openingClosedBoxOpacity = openingProgress.interpolate({ inputRange: [0, 0.44, 0.5, 0.64, 0.72, 1], outputRange: [0, 0, 1, 1, 0, 0] });
+  const openingFlightOpacity = openingProgress.interpolate({ inputRange: [0, 0.025, 0.075, 0.235, 0.285, 1], outputRange: [0, 0, 1, 1, 0, 0] });
+  const openingTruckOpacity = openingProgress.interpolate({ inputRange: [0, 0.245, 0.295, 0.455, 0.51, 1], outputRange: [0, 0, 1, 1, 0, 0] });
+  const openingClosedBoxOpacity = openingProgress.interpolate({ inputRange: [0, 0.515, 0.555, 0.64, 0.72, 1], outputRange: [0, 0, 1, 1, 0, 0] });
   const openingOpenBoxOpacity = openingProgress.interpolate({ inputRange: [0, 0.64, 0.72, 1], outputRange: [0, 0, 1, 1] });
   const openingBoxLift = openingProgress.interpolate({ inputRange: [0, 0.64, 0.76, 1], outputRange: [3, 3, -4, -4] });
+  const loginEntranceOpacity = loginEntranceProgress.interpolate({ inputRange: [0, 0.18, 1], outputRange: [0, 0, 1] });
+  const loginEntranceTranslateY = loginEntranceProgress.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
+  const homeSearchTranslateY = homeSearchEntrance.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  const homeCarouselTranslateY = homeCarouselEntrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] });
+  const homeCategoryTranslateY = homeCategoryEntrance.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
+  const homeTrendingTranslateY = homeTrendingEntrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+  const homeBestSellingTranslateY = homeBestSellingEntrance.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+  const pincodeModalScale = pincodeModalProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+  const pincodeModalTranslateY = pincodeModalProgress.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
+  const profileEntranceOpacity = profileEntranceProgress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.35, 1] });
+  const backRevealOpacity = backRevealProgress.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] });
+  const backRevealTranslateX = backRevealProgress.interpolate({ inputRange: [0, 1], outputRange: [-34, 0] });
   const homeHeaderHeight = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') ? 126 : 82, 0] });
   const homeHeaderOpacity = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const homeFooterTranslateY = browseFooterProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 74] });
@@ -870,17 +902,89 @@ function Storefront() {
 
   useEffect(() => {
     openingProgress.setValue(0);
+    openingFlightProgress.setValue(0);
+    openingTruckProgress.setValue(0);
     const openingAnimation = Animated.timing(openingProgress, {
       toValue: 1,
-      duration: 5000,
+      duration: 5400,
       easing: Easing.linear,
       useNativeDriver: true,
     });
+    const flightAnimation = Animated.sequence([
+      Animated.delay(300),
+      Animated.timing(openingFlightProgress, {
+        toValue: 1,
+        duration: 1140,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+    const truckAnimation = Animated.sequence([
+      Animated.delay(1480),
+      Animated.timing(openingTruckProgress, {
+        toValue: 1,
+        duration: 1190,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+    flightAnimation.start();
+    truckAnimation.start();
     openingAnimation.start(({ finished }) => {
       if (finished) setOpeningAnimationVisible(false);
     });
-    return () => openingAnimation.stop();
-  }, [contentWidth, openingProgress]);
+    return () => {
+      openingAnimation.stop();
+      flightAnimation.stop();
+      truckAnimation.stop();
+    };
+  }, [contentWidth, openingFlightProgress, openingProgress, openingTruckProgress]);
+
+  useEffect(() => {
+    const shouldShowInitialLogin = !openingAnimationVisible && !customerAuth.loading && !customerAuth.isLoggedIn && !initialLoginSkipped && !checkoutLoginRequired;
+    if (!shouldShowInitialLogin) {
+      loginEntranceProgress.setValue(0);
+      return;
+    }
+    const entranceAnimation = Animated.timing(loginEntranceProgress, {
+      toValue: 1,
+      duration: 560,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    entranceAnimation.start();
+    return () => entranceAnimation.stop();
+  }, [checkoutLoginRequired, customerAuth.isLoggedIn, customerAuth.loading, initialLoginSkipped, loginEntranceProgress, openingAnimationVisible]);
+
+  useEffect(() => {
+    const shouldShowStorefront = !openingAnimationVisible && !customerAuth.loading && (customerAuth.isLoggedIn || initialLoginSkipped) && !checkoutLoginRequired;
+    if (!shouldShowStorefront) {
+      storefrontEntranceProgress.setValue(0);
+      return;
+    }
+    const entranceAnimation = Animated.timing(storefrontEntranceProgress, {
+      toValue: 1,
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    entranceAnimation.start();
+    return () => entranceAnimation.stop();
+  }, [checkoutLoginRequired, customerAuth.isLoggedIn, customerAuth.loading, initialLoginSkipped, openingAnimationVisible, storefrontEntranceProgress]);
+
+  useEffect(() => {
+    const sections = [homeSearchEntrance, homeCarouselEntrance, homeCategoryEntrance, homeTrendingEntrance, homeBestSellingEntrance];
+    sections.forEach(section => section.setValue(0));
+    if (screen !== 'home' || footerPageTransitioning || openingAnimationVisible || customerAuth.loading || (!customerAuth.isLoggedIn && !initialLoginSkipped) || checkoutLoginRequired) return;
+    const entranceAnimation = Animated.stagger(95, sections.map(section => Animated.timing(section, {
+      toValue: 1,
+      duration: 460,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    })));
+    entranceAnimation.start();
+    return () => entranceAnimation.stop();
+  }, [checkoutLoginRequired, customerAuth.isLoggedIn, customerAuth.loading, footerPageTransitioning, homeBestSellingEntrance, homeCarouselEntrance, homeCategoryEntrance, homeSearchEntrance, homeTrendingEntrance, initialLoginSkipped, openingAnimationVisible, screen]);
 
   useEffect(() => {
     if (!checkoutLoginRequired || !customerAuth.isLoggedIn) return;
@@ -889,16 +993,18 @@ function Storefront() {
   }, [checkoutLoginRequired, customerAuth.isLoggedIn]);
 
   useEffect(() => {
-    if (screen !== 'home') return;
-    setActiveBanner(0);
-    carouselPositionRef.current = carouselSlideCount;
-    const frame = requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: carouselStep * carouselSlideCount, animated: false }));
+    if (screen !== 'home' || footerPageTransitioning) return;
+    const initialSlide = carouselSlideCount > 1 ? 1 : 0;
+    setActiveBanner(initialSlide);
+    carouselPositionRef.current = carouselSlideCount + initialSlide;
+    const frame = requestAnimationFrame(() => carouselRef.current?.scrollTo({ x: carouselStep * carouselPositionRef.current, animated: false }));
     return () => cancelAnimationFrame(frame);
-  }, [activeHomeMenu.label, carouselSlideCount, carouselStep, screen]);
+  }, [activeHomeMenu.label, carouselSlideCount, carouselStep, footerPageTransitioning, screen]);
 
   useEffect(() => {
-    if (screen !== 'home' || carouselSlideCount < 2) return;
-    const interval = setInterval(() => {
+    const homeIsVisible = screen === 'home' && !footerPageTransitioning && !openingAnimationVisible && !customerAuth.loading && (customerAuth.isLoggedIn || initialLoginSkipped) && !checkoutLoginRequired;
+    if (!homeIsVisible || carouselSlideCount < 2) return;
+    const advanceCarousel = () => {
       let nextPosition = carouselPositionRef.current + 1;
       if (nextPosition >= carouselSlideCount * 2) {
         carouselPositionRef.current = carouselSlideCount;
@@ -907,9 +1013,10 @@ function Storefront() {
       }
       carouselPositionRef.current = nextPosition;
       carouselRef.current?.scrollTo({ x: carouselStep * nextPosition, animated: true });
-    }, 3000);
+    };
+    const interval = setInterval(advanceCarousel, 3000);
     return () => clearInterval(interval);
-  }, [carouselSlideCount, carouselStep, screen]);
+  }, [carouselSlideCount, carouselStep, checkoutLoginRequired, customerAuth.isLoggedIn, customerAuth.loading, footerPageTransitioning, initialLoginSkipped, openingAnimationVisible, screen]);
 
   useEffect(() => {
     fetchShopifyProducts()
@@ -1029,9 +1136,20 @@ function Storefront() {
     setScreen('cart');
   };
 
+  const navigateBack = (target: typeof screen) => {
+    backRevealProgress.setValue(0);
+    setScreen(target);
+    requestAnimationFrame(() => Animated.timing(backRevealProgress, {
+      toValue: 1,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start());
+  };
+
   const returnFromCart = () => {
     setCartPopupVisible(cartItems.length > 0);
-    setScreen(cartReturnScreen);
+    navigateBack(cartReturnScreen);
   };
 
   const openProduct = (product: Product, preferredCollectionId?: string) => {
@@ -1062,8 +1180,52 @@ function Storefront() {
     setScreen('categoryCollection');
   };
 
+  const openFooterPage = (target: 'home' | 'categories' | 'orders' | 'wishlist' | 'offers') => {
+    if (screen === target || footerPageTransitioning) return;
+    setActiveFooterTab(target);
+    setFooterPageTransitioning(true);
+    requestAnimationFrame(() => {
+      setScreen(target);
+      requestAnimationFrame(() => setFooterPageTransitioning(false));
+    });
+  };
+
+  const openPincodeModal = () => {
+    pincodeModalProgress.setValue(0);
+    setPincodeModalVisible(true);
+    requestAnimationFrame(() => Animated.spring(pincodeModalProgress, {
+      toValue: 1,
+      damping: 20,
+      stiffness: 210,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start());
+  };
+
+  const openProfile = () => {
+    profileEntranceProgress.setValue(0);
+    setScreen('profile');
+    requestAnimationFrame(() => Animated.timing(profileEntranceProgress, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start());
+  };
+
+  const closePincodeModal = () => {
+    Animated.timing(pincodeModalProgress, {
+      toValue: 0,
+      duration: 170,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setPincodeModalVisible(false);
+    });
+  };
+
   const openOffers = () => {
-    setScreen('offers');
+    openFooterPage('offers');
   };
 
   const isTrackableOrder = (order: HistoryOrder) => order.status === 'Shipped' || order.status === 'Processing';
@@ -1107,7 +1269,7 @@ function Storefront() {
   );
 
   if (!openingAnimationVisible && !customerAuth.loading && !customerAuth.isLoggedIn && !initialLoginSkipped && !checkoutLoginRequired) {
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><SkippableLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onSkip={() => setInitialLoginSkipped(true)} /></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><Animated.View style={[styles.loginEntrance, { opacity: loginEntranceOpacity, transform: [{ translateY: loginEntranceTranslateY }] }]}><SkippableLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onSkip={() => setInitialLoginSkipped(true)} /></Animated.View></SafeAreaView>;
   }
 
   if (checkoutLoginRequired && !customerAuth.isLoggedIn) {
@@ -1127,7 +1289,7 @@ function Storefront() {
       hasNextPage={collectionPageHasNext}
       favoriteIds={favorites}
       onLoadMore={loadMoreCollectionProducts}
-      onBack={() => setScreen(categoryCollectionReturnScreen)}
+      onBack={() => navigateBack(categoryCollectionReturnScreen)}
       onSelectCollection={collection => {
         setCollectionPageProducts([]);
         setCollectionPageTotal(null);
@@ -1144,7 +1306,7 @@ function Storefront() {
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations.some(item => item.id === selectedProduct.id) ? productPageRecommendations : products;
-    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} favoriteIds={favorites} onBack={() => setScreen(productReturnScreen)} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); }} onOpenProduct={openProduct} onFavorite={toggleFavorite} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}<HelpFab product={selectedProduct} cartBottom={floatingCartBottom} /></SafeAreaView>;
+    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDetail width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} favoriteIds={favorites} onBack={() => navigateBack(productReturnScreen)} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); }} onOpenProduct={openProduct} onFavorite={toggleFavorite} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}<HelpFab product={selectedProduct} cartBottom={floatingCartBottom} /></Animated.View></SafeAreaView>;
   }
 
   if (screen === 'cart') {
@@ -1159,18 +1321,18 @@ function Storefront() {
       seenSuggestionIds.add(product.id);
       return true;
     }).slice(0, 16);
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} /></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} /></Animated.View></SafeAreaView>;
   }
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
 
-  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => setScreen('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></SafeAreaView>;
+  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => navigateBack('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></SafeAreaView>;
 
-  if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><AddressPage onBack={() => setScreen('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></SafeAreaView>;
+  if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><AddressPage onBack={() => navigateBack('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></SafeAreaView>;
 
   if (screen === 'search') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
     <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
-    <View style={styles.searchResultsHeader}><Pressable onPress={() => setScreen('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color="#FFFFFF" /></Pressable><View style={styles.searchResultsHeaderCopy}><Text style={styles.searchResultsHeaderTitle}>Search Results</Text><Text style={styles.searchResultsHeaderSubtitle}>Results for “{submittedSearch}”</Text></View><View style={{ width: 24 }} /></View>
+    <View style={styles.searchResultsHeader}><Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color="#FFFFFF" /></Pressable><View style={styles.searchResultsHeaderCopy}><Text style={styles.searchResultsHeaderTitle}>Search Results</Text><Text style={styles.searchResultsHeaderSubtitle}>Results for “{submittedSearch}”</Text></View><View style={{ width: 24 }} /></View>
     <ScrollView style={styles.searchResultsPage} contentContainerStyle={styles.searchResultsContent} showsVerticalScrollIndicator={false}>
       <View style={styles.wishlistHeadingBlock}><Text style={styles.wishlistHeading}>Search Results</Text><Text style={styles.wishlistCount}>{displayedSearchResults.length} products</Text></View>
       <View style={styles.searchControls}><Pressable onPress={() => setSearchFilterVisible(true)} style={[styles.searchControl, searchFilterCount > 0 && styles.searchControlActive]}><Ionicons name="options-outline" size={18} color={searchFilterCount ? '#FFFFFF' : palette.ink} /><Text numberOfLines={1} style={[styles.searchControlText, searchFilterCount > 0 && styles.searchControlTextActive]}>Filters{searchFilterCount ? ` (${searchFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={searchFilterCount ? '#FFFFFF' : palette.ink} /></Pressable><Pressable onPress={() => setSearchSort(current => current === 'Recommended' ? 'Price: Low' : current === 'Price: Low' ? 'Price: High' : current === 'Price: High' ? 'Name' : 'Recommended')} style={styles.searchControl}><Ionicons name="swap-vertical" size={18} color={palette.ink} /><Text numberOfLines={1} style={styles.searchControlText}>Sort: {searchSort}</Text><Ionicons name="chevron-down" size={15} color={palette.ink} /></Pressable></View>
@@ -1182,30 +1344,32 @@ function Storefront() {
   if (screen === 'profile') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
     <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
     <View style={styles.profileHeader}>
-      <Pressable onPress={() => setScreen('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable>
+      <Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable>
       <View style={styles.profileHeaderCopy}><Text style={styles.profileHeaderTitle}>My Profile</Text><Text style={styles.profileHeaderSubtitle}>Account, support and policies</Text></View>
-      <View style={styles.profileHeaderSpacer} />
+      <View style={styles.profileHeaderAccount}><Ionicons name="person-circle" size={46} color={palette.white} /></View>
     </View>
-    <ProfilePage customer={customerAuth.customer} onLogout={() => { void customerAuth.logout(); setInitialLoginSkipped(false); setCheckoutLoginRequired(false); setScreen('home'); }} />
+    <Animated.View style={[styles.profileEntrance, { opacity: profileEntranceOpacity }]}>
+      <ProfilePage customer={customerAuth.customer} onLogout={() => { void customerAuth.logout(); setInitialLoginSkipped(false); setCheckoutLoginRequired(false); setScreen('home'); }} />
+    </Animated.View>
   </SafeAreaView>;
 
   return (
     <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
-      <View style={[styles.app, { width: contentWidth }]}>
+      <Animated.View style={[styles.app, activeFooterTab === 'home' && styles.homeEntranceBackground, { width: contentWidth, opacity: Animated.multiply(storefrontEntranceProgress, backRevealOpacity), transform: [{ translateX: backRevealTranslateX }] }]}>
         {screen === 'collection' ? <View style={styles.collectionHeader}>
-          <Pressable onPress={() => setScreen('home')} hitSlop={10}><Ionicons name="arrow-back" size={19} color={palette.white} /></Pressable>
+          <Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={19} color={palette.white} /></Pressable>
           <Text style={styles.collectionHeaderTitle}>AUDIO</Text>
           <View style={styles.collectionHeaderActions}><Ionicons name="search-outline" size={20} color={palette.white} /><Ionicons name="cart-outline" size={22} color={palette.white} /></View>
         </View> : collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
           <View style={[styles.deliveryHeader, screen === 'home' && styles.homeHeroSurface]}>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
-            <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.white} /><Text style={[styles.addAddressText, styles.homeHeaderText]}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
+            <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.white} /><Text style={[styles.addAddressText, styles.homeHeaderText]}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
           <View style={styles.deliveryActions}>
             <View>
-              <Pressable onPress={() => customerAuth.isLoggedIn ? setScreen('profile') : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.white} /></Pressable>
+              <Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.white} /></Pressable>
             </View>
           </View>
           </View>
@@ -1213,20 +1377,21 @@ function Storefront() {
         </Animated.View> : <View style={styles.deliveryHeader}>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
-            <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
+            <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable onPress={() => customerAuth.isLoggedIn ? setScreen('profile') : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
+          <View style={styles.deliveryActions}><Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
         </View>}
 
-        {screen === 'home' && <View style={[styles.staticSearchZone, styles.homeHeroSurface]}>
+        {screen === 'home' && <Animated.View style={[styles.staticSearchZone, styles.homeHeroSurface, { opacity: homeSearchEntrance, transform: [{ translateY: homeSearchTranslateY }] }]}>
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={20} color={palette.ink} />
             <TextInput value={searchQuery} onChangeText={setSearchQuery} onFocus={() => setKeyboardVisible(true)} onBlur={() => setKeyboardVisible(false)} onSubmitEditing={submitSearch} returnKeyType="search" placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
           </View>
-        </View>}
+        </Animated.View>}
 
         <Animated.ScrollView
           key={screen}
+          style={{ backgroundColor: activeFooterTab === 'home' ? '#0A254A' : palette.white }}
           showsVerticalScrollIndicator={false}
           bounces={false}
           overScrollMode="never"
@@ -1250,6 +1415,7 @@ function Storefront() {
           scrollEventThrottle={16}
         >
           {screen === 'home' ? <>
+          <Animated.View style={{ opacity: homeCarouselEntrance, transform: [{ translateY: homeCarouselTranslateY }] }}>
           <View style={[styles.carouselHeaderZone, styles.homeHeroSurface]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
             {displayHomeMenus.map((menu, index) => (
@@ -1266,6 +1432,7 @@ function Storefront() {
             horizontal
             showsHorizontalScrollIndicator={false}
             ref={carouselRef}
+            contentOffset={{ x: carouselStep * (carouselSlideCount + (carouselSlideCount > 1 ? 1 : 0)), y: 0 }}
             snapToInterval={carouselStep}
             decelerationRate="normal"
             overScrollMode="never"
@@ -1300,7 +1467,8 @@ function Storefront() {
           </View>
           </View>
           <View style={[styles.zigzagPartition, styles.homeHeroSurface]}>{Array.from({ length: 30 }).map((_, index) => <View key={index} style={styles.zigzagTooth} />)}</View>
-          <View style={styles.homeProductSections}>
+          </Animated.View>
+          <Animated.View style={[styles.homeProductSections, { opacity: homeCategoryEntrance, transform: [{ translateY: homeCategoryTranslateY }] }]}>
           <SectionTitle>Shop by Category</SectionTitle>
           <View style={styles.shopCategoryGrid}>
             {shopCategories.map(({ id, label, image, collection, group }) => <Pressable key={id} style={styles.shopCategoryItem} onPress={() => {
@@ -1314,15 +1482,19 @@ function Storefront() {
               <Text numberOfLines={2} style={styles.shopCategoryLabel}>{label}</Text>
             </Pressable>)}
           </View>
+          </Animated.View>
+          <Animated.View style={[styles.homeProductSections, { opacity: homeTrendingEntrance, transform: [{ translateY: homeTrendingTranslateY }] }]}>
           <SectionTitle>Trending</SectionTitle>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
             {categoryProducts.map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </ScrollView>
+          </Animated.View>
+          <Animated.View style={[styles.homeProductSections, { opacity: homeBestSellingEntrance, transform: [{ translateY: homeBestSellingTranslateY }] }]}>
           <SectionTitle>Best Selling</SectionTitle>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
             {categoryProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </ScrollView>
-          </View>
+          </Animated.View>
 
           </> : screen === 'orders' ? <View style={styles.ordersPage}>
             <View style={styles.ordersHeadingBlock}>
@@ -1407,36 +1579,38 @@ function Storefront() {
         </Animated.ScrollView>
         {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><ActivityIndicator size="small" color={palette.blue} /><Text style={styles.searchNoSuggestions}>Searching…</Text></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
         <Animated.View style={[styles.floatingFooter, collapseBrowseChrome && { opacity: homeFooterOpacity, transform: [{ translateY: homeFooterTranslateY }] }]}> 
-          <Pressable onPress={() => setScreen('home')} style={[styles.footerTab, (screen === 'home' || screen === 'collection') && styles.footerTabSelected]}>
-            <Ionicons name={screen === 'home' ? 'home' : 'home-outline'} size={25} color={screen === 'home' ? palette.blue : palette.muted} />
-            <Text style={[styles.footerTabText, screen === 'home' && styles.footerTabActive]}>Home</Text>
+          <Pressable onPress={() => openFooterPage('home')} style={[styles.footerTab, activeFooterTab === 'home' && styles.footerTabSelected]}>
+            <Ionicons name={activeFooterTab === 'home' ? 'home' : 'home-outline'} size={25} color={activeFooterTab === 'home' ? palette.blue : palette.muted} />
+            <Text style={[styles.footerTabText, activeFooterTab === 'home' && styles.footerTabActive]}>Home</Text>
           </Pressable>
-          <Pressable onPress={() => setScreen('categories')} style={[styles.footerTab, screen === 'categories' && styles.footerTabSelected]}>
-            <Ionicons name={screen === 'categories' ? 'grid' : 'grid-outline'} size={25} color={screen === 'categories' ? palette.blue : palette.muted} />
-            <Text style={[styles.footerTabText, screen === 'categories' && styles.footerTabActive]}>Categories</Text>
+          <Pressable onPress={() => openFooterPage('categories')} style={[styles.footerTab, activeFooterTab === 'categories' && styles.footerTabSelected]}>
+            <Ionicons name={activeFooterTab === 'categories' ? 'grid' : 'grid-outline'} size={25} color={activeFooterTab === 'categories' ? palette.blue : palette.muted} />
+            <Text style={[styles.footerTabText, activeFooterTab === 'categories' && styles.footerTabActive]}>Categories</Text>
           </Pressable>
-          <Pressable onPress={() => setScreen('orders')} style={[styles.footerTab, screen === 'orders' && styles.footerTabSelected]}>
-            <Ionicons name={screen === 'orders' ? 'bag-handle' : 'bag-handle-outline'} size={25} color={screen === 'orders' ? palette.blue : '#555'} />
-            <Text style={[styles.footerTabText, screen === 'orders' && styles.footerTabActive]}>Orders</Text>
+          <Pressable onPress={() => openFooterPage('orders')} style={[styles.footerTab, activeFooterTab === 'orders' && styles.footerTabSelected]}>
+            <Ionicons name={activeFooterTab === 'orders' ? 'bag-handle' : 'bag-handle-outline'} size={25} color={activeFooterTab === 'orders' ? palette.blue : '#555'} />
+            <Text style={[styles.footerTabText, activeFooterTab === 'orders' && styles.footerTabActive]}>Orders</Text>
           </Pressable>
-          <Pressable onPress={() => setScreen('wishlist')} style={[styles.footerTab, screen === 'wishlist' && styles.footerTabSelected]}>
-            <Ionicons name={screen === 'wishlist' ? 'heart' : 'heart-outline'} size={25} color={screen === 'wishlist' ? palette.blue : '#555'} />
-            <Text style={[styles.footerTabText, screen === 'wishlist' && styles.footerTabActive]}>Wishlist</Text>
+          <Pressable onPress={() => openFooterPage('wishlist')} style={[styles.footerTab, activeFooterTab === 'wishlist' && styles.footerTabSelected]}>
+            <Ionicons name={activeFooterTab === 'wishlist' ? 'heart' : 'heart-outline'} size={25} color={activeFooterTab === 'wishlist' ? palette.blue : '#555'} />
+            <Text style={[styles.footerTabText, activeFooterTab === 'wishlist' && styles.footerTabActive]}>Wishlist</Text>
           </Pressable>
-          <Pressable onPress={openOffers} style={[styles.footerTab, styles.offersFooterTab, screen === 'offers' && styles.footerTabSelected]}>
+          <Pressable onPress={openOffers} style={[styles.footerTab, styles.offersFooterTab, activeFooterTab === 'offers' && styles.footerTabSelected]}>
             <View style={styles.offersFooterBadge}><Image source={footerDiscountTag} style={styles.offersFooterImage} resizeMode="contain" /></View>
           </Pressable>
         </Animated.View>
-      </View>
-      <Modal visible={pincodeModalVisible} transparent animationType="fade" onRequestClose={() => setPincodeModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setPincodeModalVisible(false)}>
-          <Pressable style={styles.pincodeModal} onPress={() => {}}>
+      </Animated.View>
+      <Modal visible={pincodeModalVisible} transparent animationType="none" onRequestClose={closePincodeModal}>
+        <Animated.View style={[styles.modalBackdrop, { opacity: pincodeModalProgress }]}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={closePincodeModal} />
+          <Animated.View style={{ transform: [{ translateY: pincodeModalTranslateY }, { scale: pincodeModalScale }] }}><Pressable style={styles.pincodeModal} onPress={() => {}}>
             <Text style={styles.pincodeTitle}>Check delivery availability</Text>
             <Text style={styles.pincodeCopy}>Enter your pincode to see whether delivery is available in your area.</Text>
             <TextInput value={pincode} onChangeText={setPincode} keyboardType="number-pad" maxLength={6} placeholder="Enter 6 digit pincode" placeholderTextColor="#8D8D8D" style={styles.pincodeInput} />
-            <Pressable onPress={() => { setDeliveryPincode(pincode); setPincodeModalVisible(false); }} style={styles.pincodeCheck}><Text style={styles.pincodeCheckText}>Check</Text></Pressable>
+            <Pressable onPress={() => { setDeliveryPincode(pincode); closePincodeModal(); }} style={styles.pincodeCheck}><Text style={styles.pincodeCheckText}>Check</Text></Pressable>
           </Pressable>
-        </Pressable>
+          </Animated.View>
+        </Animated.View>
       </Modal>
       <Modal visible={Boolean(selectedHistoryOrder)} transparent animationType="slide" onRequestClose={closeHistoryOrder}>
         <View style={styles.orderModalBackdrop}>
@@ -1509,6 +1683,9 @@ const styles = StyleSheet.create({
   homeSafeArea: { backgroundColor: '#0A254A' },
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
+  backRevealPage: { flex: 1 },
+  homeEntranceBackground: { backgroundColor: '#0A254A' },
+  loginEntrance: { flex: 1 },
   openingAnimationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, overflow: 'hidden', alignItems: 'center', backgroundColor: '#0A254A' },
   openingSequenceGroup: { position: 'absolute', top: '50%', left: 0, right: 0, marginTop: -87, height: 134, alignItems: 'center', justifyContent: 'center' },
   openingRoute: { width: 260, height: 70, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -1517,11 +1694,12 @@ const styles = StyleSheet.create({
   openingAnimationMessage: { marginTop: 12, paddingHorizontal: 24, color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 24, fontStyle: 'italic', textAlign: 'center' },
   openingVehicle: { position: 'absolute' },
   homeCollapsibleHeader: { overflow: 'hidden', backgroundColor: '#0A254A' },
-  profileHeader: { height: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#294565' },
+  profileEntrance: { flex: 1, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  profileHeader: { height: 82, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#294565' },
   profileHeaderCopy: { flex: 1, marginHorizontal: 14 },
   profileHeaderTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   profileHeaderSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
-  profileHeaderSpacer: { width: 24 },
+  profileHeaderAccount: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
   deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A' },
   transportLane: { height: 44, overflow: 'hidden', position: 'relative', backgroundColor: homeChrome },
   orbitLine: { position: 'absolute', left: 0, right: 0, top: 16, height: 4, borderRadius: 2, backgroundColor: '#C9D2DF' },
@@ -1535,7 +1713,7 @@ const styles = StyleSheet.create({
   deliveryBrandBlock: { zIndex: 1, flex: 1, marginLeft: 0, position: 'relative' },
   deliveryLogo: { width: 245, height: 63, marginTop: -15, marginLeft: -39, alignSelf: 'flex-start' },
   addAddressButton: { position: 'absolute', left: -39, bottom: -17, width: 245, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  addAddressText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '500' },
+  addAddressText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '500', fontStyle: 'italic', textDecorationLine: 'underline' },
   homeHeaderText: { color: palette.white },
   deliveryBrand: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '800' },
   deliveryTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
@@ -1563,8 +1741,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 0, paddingBottom: 72 },
   browseContent: { paddingBottom: 10 },
   carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: homeChrome },
-  carouselFade: { marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
-  carouselLoading: { height: 238, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A254A' },
+  carouselFade: { minHeight: 307, marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
+  carouselLoading: { height: 307, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A254A' },
   carouselLoadingText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
   cartonLoader: { width: 66, height: 58, alignItems: 'center', justifyContent: 'flex-end' },
   openingCarton: { width: 46, height: 46 },
@@ -1642,7 +1820,7 @@ const styles = StyleSheet.create({
   blinkDividerText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
   trendingProductRow: { gap: 12, paddingHorizontal: 2, paddingBottom: 5 },
-  homeProductSections: { paddingHorizontal: 12 },
+  homeProductSections: { paddingHorizontal: 12, backgroundColor: palette.white },
   shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5, rowGap: 14 },
   shopCategoryItem: { width: '25%', paddingHorizontal: 5, alignItems: 'center' },
   shopCategoryImageBlock: { width: '100%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 3 },
