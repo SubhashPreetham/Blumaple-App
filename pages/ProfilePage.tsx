@@ -4,11 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { ShopifyCustomer } from '../src/shopifyCustomerAuth';
 import { savedAddresses } from './AddressPage';
 
-type Section = 'personal' | 'addresses' | 'about' | 'policies' | 'faq' | 'notifications';
+type Section = 'personal' | 'addresses' | 'billing' | 'about' | 'policies' | 'faq' | 'notifications';
 
 const menu: Array<{ id: Section; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { id: 'personal', label: 'Personal', icon: 'person-outline' },
   { id: 'addresses', label: 'Saved address', icon: 'location-outline' },
+  { id: 'billing', label: 'Billing address', icon: 'business-outline' },
   { id: 'about', label: 'About us', icon: 'information-circle-outline' },
   { id: 'policies', label: 'Policies', icon: 'document-text-outline' },
   { id: 'faq', label: 'FAQ', icon: 'help-circle-outline' },
@@ -29,7 +30,7 @@ const faqItems = [
 ] as const;
 
 type ProfileAddress = { label: string; name: string; lastName: string; email: string; phone: string; company: string; building: string; line: string; city: string; state: string; pincode: string; gstin?: string };
-const emptyAddress: ProfileAddress = { label: 'Home', name: '', lastName: '', email: '', phone: '', company: '', building: '', line: '', city: '', state: 'Telangana', pincode: '' };
+const emptyAddress: ProfileAddress = { label: 'Home', name: '', lastName: '', email: '', phone: '', company: '', building: '', line: '', city: '', state: '', pincode: '' };
 
 function AddressField({ placeholder, value, onChangeText, keyboardType = 'default', maxLength }: { placeholder: string; value: string; onChangeText: (value: string) => void; keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'number-pad'; maxLength?: number }) {
   return <TextInput style={s.modalField} placeholder={placeholder} placeholderTextColor="#777E89" value={value} onChangeText={onChangeText} keyboardType={keyboardType} maxLength={maxLength} />;
@@ -98,7 +99,7 @@ Phone/WhatsApp: +91 9000133275
 Website: https://blumaple.com`,
   },
   {
-    title: 'Shipping Policy – Blumaple LLP',
+    title: 'Shipping Policy',
     content: `Thank you for shopping with Blumaple LLP. We are committed to ensuring a smooth and reliable delivery experience across India.
 
 1. Processing Time
@@ -140,7 +141,7 @@ Email: help@blumaple.com
 Phone/WhatsApp: +91 9000133275`,
   },
   {
-    title: 'Terms and Conditions – Blumaple LLP',
+    title: 'Terms and Conditions',
     content: `Welcome to Blumaple LLP (“we,” “us,” or “our”). By accessing our website, purchasing products, or using our services, you agree to these Terms and Conditions.
 
 1. Acceptance of Terms
@@ -198,7 +199,7 @@ Note for Customers
 Certain international warranties may not be valid in India. Review product-specific warranty and return details before purchase.`,
   },
   {
-    title: 'Privacy Policy – Blumaple',
+    title: 'Privacy Policy',
     content: `Effective Date: 07-07-2025
 
 Blumaple respects your privacy and is committed to protecting the personal information you share with us.
@@ -260,16 +261,28 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
   const [addressModal, setAddressModal] = useState<'saved' | 'billing' | null>(null);
   const [addressForm, setAddressForm] = useState<ProfileAddress>(emptyAddress);
   const [notifications, setNotifications] = useState({ orders: true, offers: true, arrivals: false, whatsapp: true });
+  const loggedIn = Boolean(customer);
   const toggle = (key: keyof typeof notifications) => setNotifications(current => ({ ...current, [key]: !current[key] }));
   const setAddressValue = (key: keyof ProfileAddress, value: string) => setAddressForm(current => ({ ...current, [key]: value }));
   const openAddressModal = (kind: 'saved' | 'billing') => { setAddressForm({ ...emptyAddress }); setAddressModal(kind); };
   const saveProfileAddress = () => {
-    if (addressForm.name.trim().length < 2 || addressForm.phone.length !== 10 || addressForm.building.trim().length < 2 || addressForm.city.trim().length < 2 || addressForm.pincode.length !== 6 || (addressModal === 'billing' && !addressForm.gstin?.trim())) {
+    const commonFieldsInvalid = addressForm.phone.length !== 10 || addressForm.building.trim().length < 2 || addressForm.city.trim().length < 2 || addressForm.pincode.length !== 6;
+    const identityFieldsInvalid = addressModal === 'billing'
+      ? !addressForm.gstin?.trim() || addressForm.company.trim().length < 2
+      : addressForm.name.trim().length < 2;
+    if (commonFieldsInvalid || identityFieldsInvalid) {
       Alert.alert('Complete your address', `Fill all required ${addressModal === 'billing' ? 'billing' : 'address'} fields.`); return;
     }
     const saved = { ...addressForm, label: addressModal === 'billing' ? 'Billing' : addressForm.label || 'Home' };
-    addressModal === 'billing' ? setBillingAddresses(current => [...current, saved]) : setProfileAddresses(current => [...current, saved]);
+    addressModal === 'billing' ? setBillingAddresses([saved]) : setProfileAddresses(current => [...current, saved]);
     setAddressModal(null);
+  };
+  const confirmLogout = () => {
+    if (!loggedIn) return;
+    Alert.alert('Are you sure?', 'Do you want to log out?', [
+      { text: 'No', style: 'cancel' },
+      { text: 'Yes', style: 'destructive', onPress: onLogout },
+    ]);
   };
 
   return <View style={s.page}>
@@ -293,17 +306,19 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
         {section === 'addresses' ? <>
           <Text style={s.sectionTitle}>Saved addresses</Text>
           {profileAddresses.map((address, index) => <View key={`${address.label}-${index}`} style={s.addressCard}>
-            <View style={s.addressHeader}><Text style={s.addressLabel}>{address.label}</Text><Ionicons name="location" size={16} color="#3F72E5" /></View>
+            <View style={s.addressHeader}><Text style={s.addressLabel}>{address.label}</Text><Pressable onPress={() => setProfileAddresses(current => current.filter((_, addressIndex) => addressIndex !== index))} hitSlop={8} style={s.deleteAddressButton}><Ionicons name="trash-outline" size={14} color="#C93835" /></Pressable></View>
             <Text style={s.addressName}>{address.name}</Text>
             <Text style={s.body}>{address.building}, {address.line}</Text>
             <Text style={s.body}>{address.city}, {address.state} – {address.pincode}</Text>
             <Text style={s.body}>+91 {address.phone}</Text>
           </View>)}
           <Pressable onPress={() => openAddressModal('saved')} style={s.addAddressButton}><Ionicons name="add-circle-outline" size={19} color="#3F72E5" /><Text style={s.addAddressText}>Add address</Text></Pressable>
-          <View style={s.addressSectionDivider} />
+        </> : null}
+
+        {section === 'billing' ? <>
           <Text style={s.sectionTitle}>Billing address</Text>
-          {billingAddresses.map((address, index) => <View key={`billing-${index}`} style={s.addressCard}><View style={s.addressHeader}><Text style={s.addressLabel}>Billing</Text><Ionicons name="business" size={16} color="#3F72E5" /></View><Text style={s.addressName}>{address.company}</Text><Text style={s.gstinValue}>GSTIN: {address.gstin}</Text><Text style={s.body}>{address.building}{address.line ? `, ${address.line}` : ''}</Text><Text style={s.body}>{address.city}, {address.state} – {address.pincode}</Text><Text style={s.body}>+91 {address.phone}</Text></View>)}
-          <Pressable onPress={() => openAddressModal('billing')} style={s.addAddressButton}><Ionicons name="add-circle-outline" size={19} color="#3F72E5" /><Text style={s.addAddressText}>Add billing address</Text></Pressable>
+          {billingAddresses.map((address, index) => <View key={`billing-${index}`} style={s.addressCard}><View style={s.addressHeader}><Text style={s.addressLabel}>Billing</Text><Pressable onPress={() => setBillingAddresses([])} hitSlop={8} style={s.deleteAddressButton}><Ionicons name="trash-outline" size={14} color="#C93835" /></Pressable></View><Text style={s.addressName}>{address.company}</Text><Text style={s.gstinValue}>GSTIN: {address.gstin}</Text><Text style={s.body}>{address.building}{address.line ? `, ${address.line}` : ''}</Text><Text style={s.body}>{address.city}, {address.state} – {address.pincode}</Text><Text style={s.body}>+91 {address.phone}</Text></View>)}
+          {!billingAddresses.length ? <><View style={s.emptyAddress}><Ionicons name="business-outline" size={30} color="#8D9AAF" /><Text style={s.emptyAddressText}>No billing address added</Text></View><Pressable onPress={() => openAddressModal('billing')} style={s.addAddressButton}><Ionicons name="add-circle-outline" size={19} color="#3F72E5" /><Text style={s.addAddressText}>Add billing address</Text></Pressable></> : null}
         </> : null}
 
         {section === 'about' ? <>
@@ -397,7 +412,7 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
       </ScrollView>
     </View>
     <Modal visible={Boolean(addressModal)} transparent animationType="slide" onRequestClose={() => setAddressModal(null)}><Pressable style={s.modalBackdrop} onPress={() => setAddressModal(null)}><Pressable style={s.addressSheet} onPress={() => {}}><View style={s.modalHeading}><Text style={s.modalTitle}>{addressModal === 'billing' ? 'Add billing address' : 'Add saved address'}</Text><Pressable onPress={() => setAddressModal(null)}><Ionicons name="close" size={24} color="#17202B" /></Pressable></View><ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={s.modalContent}>{addressModal === 'billing' ? <><AddressField placeholder="GSTIN" value={addressForm.gstin || ''} onChangeText={value => setAddressValue('gstin', value.toUpperCase())} maxLength={15} /><AddressField placeholder="Business name" value={addressForm.company} onChangeText={value => setAddressValue('company', value)} /></> : <><AddressField placeholder="Email or mobile phone number" value={addressForm.email} onChangeText={value => setAddressValue('email', value)} keyboardType="email-address" /><View style={s.modalTwoCol}><AddressField placeholder="First name" value={addressForm.name} onChangeText={value => setAddressValue('name', value)} /><AddressField placeholder="Last name (optional)" value={addressForm.lastName} onChangeText={value => setAddressValue('lastName', value)} /></View><AddressField placeholder="Company (optional)" value={addressForm.company} onChangeText={value => setAddressValue('company', value)} /></>}<AddressField placeholder="Address" value={addressForm.building} onChangeText={value => setAddressValue('building', value)} /><AddressField placeholder="Apartment, suite, etc. (optional)" value={addressForm.line} onChangeText={value => setAddressValue('line', value)} /><AddressField placeholder="City" value={addressForm.city} onChangeText={value => setAddressValue('city', value)} /><AddressField placeholder="State" value={addressForm.state} onChangeText={value => setAddressValue('state', value)} /><AddressField placeholder="PIN code" value={addressForm.pincode} onChangeText={value => setAddressValue('pincode', value)} keyboardType="number-pad" maxLength={6} /><AddressField placeholder="Phone" value={addressForm.phone} onChangeText={value => setAddressValue('phone', value)} keyboardType="phone-pad" maxLength={10} /></ScrollView><View style={s.modalActions}><Pressable onPress={() => setAddressModal(null)} style={s.modalCancel}><Text style={s.modalCancelText}>Cancel</Text></Pressable><Pressable onPress={saveProfileAddress} style={s.modalSave}><Text style={s.modalSaveText}>Save address</Text></Pressable></View></Pressable></Pressable></Modal>
-    <View style={s.footer}><Pressable onPress={onLogout} style={s.logoutButton}><Ionicons name="log-out-outline" size={18} color="#FFFFFF" /><Text style={s.logoutButtonText}>Log out</Text></Pressable></View>
+    <View style={s.footer}><Pressable disabled={!loggedIn} onPress={confirmLogout} style={[s.logoutButton, !loggedIn && s.logoutButtonDisabled]}><Ionicons name="log-out-outline" size={18} color="#FFFFFF" /><Text style={s.logoutButtonText}>Log out</Text></Pressable></View>
   </View>;
 }
 
@@ -419,8 +434,15 @@ const s = StyleSheet.create({
   primaryButtonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   addressCard: { marginBottom: 11, padding: 11, borderWidth: 1, borderColor: '#DDE3EA', borderRadius: 10, backgroundColor: '#F9FBFD' },
   addressHeader: { marginBottom: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  deleteAddressButton: { width: 27, height: 27, borderWidth: 1, borderColor: '#F0C8C7', borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF4F3' },
   addressLabel: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
   addressName: { marginBottom: 3, color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
+  gstinValue: { marginBottom: 5, color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, fontWeight: '800' },
+  addAddressButton: { minHeight: 43, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#3F72E5', borderRadius: 9, backgroundColor: '#F4F7FF' },
+  addAddressText: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  addressSectionDivider: { height: 1, marginVertical: 20, backgroundColor: '#DDE2E8' },
+  emptyAddress: { minHeight: 130, marginBottom: 13, alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: '#CED6E0', borderRadius: 10, backgroundColor: '#F9FBFD' },
+  emptyAddressText: { color: '#7A8491', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   body: { marginBottom: 10, color: '#596575', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17 },
   tagline: { marginTop: -7, marginBottom: 13, color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18, fontStyle: 'italic', fontWeight: '700' },
   aboutHeading: { marginTop: 16, marginBottom: 10, color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 21, fontWeight: '900' },
@@ -436,8 +458,25 @@ const s = StyleSheet.create({
   policyLongForm: { color: '#596575', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 18 },
   accordionHeader: { minHeight: 50, marginBottom: 10, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderWidth: 1, borderColor: '#D5DBE3', borderRadius: 9, backgroundColor: '#F5F8FC' },
   accordionTitle: { flex: 1, color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
+  faqItem: { marginBottom: 9, overflow: 'hidden', borderWidth: 1, borderColor: '#D5DBE3', borderRadius: 9, backgroundColor: '#FFFFFF' },
+  faqHeader: { minHeight: 49, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F5F8FC' },
+  faqQuestion: { flex: 1, color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, fontWeight: '800' },
+  faqAnswer: { paddingHorizontal: 11, paddingVertical: 11, color: '#596575', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 16 },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.46)' },
+  addressSheet: { maxHeight: '90%', paddingTop: 18, overflow: 'hidden', borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: '#FFFFFF' },
+  modalHeading: { paddingHorizontal: 18, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#D5DBE3' },
+  modalTitle: { color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
+  modalContent: { padding: 18, gap: 10 },
+  modalField: { flex: 1, minHeight: 50, paddingHorizontal: 13, borderWidth: 1, borderColor: '#D8DADD', borderRadius: 10, color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 13, backgroundColor: '#FFFFFF' },
+  modalTwoCol: { flexDirection: 'row', gap: 8 },
+  modalActions: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 20, flexDirection: 'row', gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#D5DBE3', backgroundColor: '#FFFFFF' },
+  modalCancel: { flex: 1, height: 46, borderWidth: 1, borderColor: '#AEB7C3', borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  modalCancelText: { color: '#536071', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '800' },
+  modalSave: { flex: 1.4, height: 46, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5' },
+  modalSaveText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
   footer: { height: 66, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#D5DBE3', backgroundColor: '#E9EDF2' },
   logoutButton: { minWidth: 132, height: 42, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 9, backgroundColor: '#3F72E5' },
+  logoutButtonDisabled: { opacity: 0.42 },
   logoutButtonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
   inlineLink: { color: '#3F72E5', fontWeight: '900' },
   notificationRow: { minHeight: 65, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DDE2E8' },

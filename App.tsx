@@ -590,7 +590,12 @@ function Storefront() {
     return () => subscription.remove();
   }, [cartItems, cartReturnScreen, categoryCollectionReturnScreen, productReturnScreen, screen]);
   const browseChromeCollapsedRef = useRef(false);
+  const browseFooterCollapsedRef = useRef(false);
+  const lastBrowseScrollYRef = useRef(0);
+  const browseContentHeightRef = useRef(0);
+  const browseViewportHeightRef = useRef(0);
   const browseChromeProgress = useRef(new Animated.Value(0)).current;
+  const browseFooterProgress = useRef(new Animated.Value(0)).current;
   const collapseBrowseChrome = screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile';
   const storefrontHeaderVisible = collapseBrowseChrome
     && screen !== 'profile'
@@ -623,8 +628,8 @@ function Storefront() {
   const openingBoxLift = openingProgress.interpolate({ inputRange: [0, 0.64, 0.76, 1], outputRange: [3, 3, -4, -4] });
   const homeHeaderHeight = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') ? 126 : 82, 0] });
   const homeHeaderOpacity = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const homeFooterTranslateY = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 74] });
-  const homeFooterOpacity = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const homeFooterTranslateY = browseFooterProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 74] });
+  const homeFooterOpacity = browseFooterProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
   const setBrowseChromeVisibility = (collapsed: boolean) => {
     // Scroll events can arrive before React has committed the state update. Keep
@@ -633,9 +638,19 @@ function Storefront() {
     browseChromeCollapsedRef.current = collapsed;
     Animated.timing(browseChromeProgress, {
       toValue: collapsed ? 1 : 0,
+      duration: 300,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  };
+  const setBrowseFooterVisibility = (collapsed: boolean) => {
+    if (collapsed === browseFooterCollapsedRef.current) return;
+    browseFooterCollapsedRef.current = collapsed;
+    Animated.timing(browseFooterProgress, {
+      toValue: collapsed ? 1 : 0,
       duration: 180,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start();
   };
   const catalog = shopifyProducts.length ? shopifyProducts : products;
@@ -841,9 +856,13 @@ function Storefront() {
 
   useEffect(() => {
     browseChromeCollapsedRef.current = false;
+    browseFooterCollapsedRef.current = false;
+    lastBrowseScrollYRef.current = 0;
     browseChromeProgress.stopAnimation();
+    browseFooterProgress.stopAnimation();
     browseChromeProgress.setValue(0);
-  }, [browseChromeProgress, collapseBrowseChrome, screen]);
+    browseFooterProgress.setValue(0);
+  }, [browseChromeProgress, browseFooterProgress, collapseBrowseChrome, screen]);
 
   useEffect(() => {
     if (screen === 'home' && !keyboardVisible) setSearchQuery('');
@@ -1186,7 +1205,7 @@ function Storefront() {
           </View>
           <View style={styles.deliveryActions}>
             <View>
-              <Pressable onPress={() => setScreen('profile')}><Ionicons name="person-circle" size={46} color={palette.white} /></Pressable>
+              <Pressable onPress={() => customerAuth.isLoggedIn ? setScreen('profile') : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.white} /></Pressable>
             </View>
           </View>
           </View>
@@ -1196,7 +1215,7 @@ function Storefront() {
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={() => setPincodeModalVisible(true)} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable onPress={() => setScreen('profile')}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
+          <View style={styles.deliveryActions}><Pressable onPress={() => customerAuth.isLoggedIn ? setScreen('profile') : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
         </View>}
 
         {screen === 'home' && <View style={[styles.staticSearchZone, styles.homeHeroSurface]}>
@@ -1212,11 +1231,21 @@ function Storefront() {
           bounces={false}
           overScrollMode="never"
           contentContainerStyle={[styles.content, collapseBrowseChrome && styles.browseContent]}
+          onLayout={event => { browseViewportHeightRef.current = event.nativeEvent.layout.height; }}
+          onContentSizeChange={(_, height) => {
+            browseContentHeightRef.current = height;
+            if (browseChromeCollapsedRef.current && height <= browseViewportHeightRef.current + 130) setBrowseChromeVisibility(false);
+          }}
           onScroll={collapseBrowseChrome ? event => {
-            const offsetY = event.nativeEvent.contentOffset.y;
-            // The separate close/open thresholds prevent slow-scroll oscillation.
-            if (!browseChromeCollapsedRef.current && offsetY > 24) setBrowseChromeVisibility(true);
-            if (browseChromeCollapsedRef.current && offsetY < 8) setBrowseChromeVisibility(false);
+            const offsetY = Math.max(0, event.nativeEvent.contentOffset.y);
+            const previousOffsetY = lastBrowseScrollYRef.current;
+            const movement = offsetY - previousOffsetY;
+            lastBrowseScrollYRef.current = offsetY;
+            const hasStableScrollRange = browseContentHeightRef.current > browseViewportHeightRef.current + 130;
+            if (!browseChromeCollapsedRef.current && offsetY > 24 && hasStableScrollRange) setBrowseChromeVisibility(true);
+            else if (browseChromeCollapsedRef.current && offsetY < 8) setBrowseChromeVisibility(false);
+            if (offsetY <= 4 || movement < -1) setBrowseFooterVisibility(false);
+            else if (offsetY > 24 && movement > 1) setBrowseFooterVisibility(true);
           } : undefined}
           scrollEventThrottle={16}
         >
@@ -1481,7 +1510,7 @@ const styles = StyleSheet.create({
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
   openingAnimationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, overflow: 'hidden', alignItems: 'center', backgroundColor: '#0A254A' },
-  openingSequenceGroup: { position: 'absolute', top: '50%', left: 0, right: 0, marginTop: -67, height: 134, alignItems: 'center', justifyContent: 'center' },
+  openingSequenceGroup: { position: 'absolute', top: '50%', left: 0, right: 0, marginTop: -87, height: 134, alignItems: 'center', justifyContent: 'center' },
   openingRoute: { width: 260, height: 70, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   openingSequenceVehicle: { position: 'absolute' },
   openingBox: { position: 'absolute', width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
@@ -1784,10 +1813,10 @@ const styles = StyleSheet.create({
   wishlistGrid: { paddingHorizontal: 12, paddingBottom: 18, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 14 },
   wishlistCard: { padding: 9, borderWidth: 1, borderColor: '#E3E7EC', borderRadius: 14, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.09, shadowRadius: 5, elevation: 3 },
   wishlistProductLink: { flex: 1 },
-  wishlistImageFrame: { width: '100%', aspectRatio: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F8FA' },
+  wishlistImageFrame: { width: '100%', aspectRatio: 1, padding: 8, overflow: 'hidden', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   wishlistDiscountBadge: { position: 'absolute', top: 7, left: 7, minHeight: 23, paddingHorizontal: 7, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
   wishlistDiscountBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '900' },
-  wishlistImage: { width: '91%', height: '91%' },
+  wishlistImage: { width: '100%', height: '100%' },
   wishlistTitle: { minHeight: 38, marginTop: 9, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '800' },
   wishlistPriceRow: { width: '100%', minHeight: 20, marginTop: 5, overflow: 'hidden', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'baseline', columnGap: 3 },
   wishlistPrice: { flexShrink: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
