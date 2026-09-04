@@ -294,7 +294,7 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
         </Pressable>)}
       </View>
 
-      <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+      <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false} nestedScrollEnabled bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">
         {section === 'personal' ? <>
           <Text style={s.sectionTitle}>Personal details</Text>
           <Detail label="Name" value={customer?.displayName || 'Admin'} />

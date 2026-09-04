@@ -55,6 +55,9 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const [selectedShipping, setSelectedShipping] = useState<Set<string>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [notifiedIds, setNotifiedIds] = useState<Set<string>>(new Set());
+  const [notifyMessageId, setNotifyMessageId] = useState<string | null>(null);
+  const notifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchProgress = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<TextInput>(null);
   const searchWidth = searchProgress.interpolate({ inputRange: [0, 1], outputRange: [46, Math.min(Dimensions.get('window').width, 430) - 24] });
@@ -78,6 +81,30 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     setSelectedBrands(new Set());
     setSelectedShipping(new Set());
   }, [selectedCollection.id]);
+
+  useEffect(() => () => {
+    if (notifyTimer.current) clearTimeout(notifyTimer.current);
+  }, []);
+
+  const requestNotification = (productId: string) => {
+    if (notifyTimer.current) clearTimeout(notifyTimer.current);
+    if (notifiedIds.has(productId)) {
+      setNotifiedIds(current => {
+        const next = new Set(current);
+        next.delete(productId);
+        return next;
+      });
+      setNotifyMessageId(null);
+      notifyTimer.current = null;
+      return;
+    }
+    setNotifiedIds(current => new Set(current).add(productId));
+    setNotifyMessageId(productId);
+    notifyTimer.current = setTimeout(() => {
+      setNotifyMessageId(null);
+      notifyTimer.current = null;
+    }, 1000);
+  };
 
   const brands = useMemo(() => [...new Set(products.map(product => product.brandName?.value.trim() ?? '').filter(Boolean))].sort(), [products]);
   const shippingOptions = useMemo(() => [...new Set(products.map(product => product.vendor.trim()).filter(Boolean))].sort(), [products]);
@@ -123,7 +150,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     </View>
 
     <View style={s.content}>
-      <ScrollView showsVerticalScrollIndicator={false} style={s.collectionRail} contentContainerStyle={s.collectionRailContent}>
+      <ScrollView showsVerticalScrollIndicator={false} style={s.collectionRail} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.collectionRailContent}>
         {collections.map(collection => {
           const active = collection.id === selectedCollection.id;
           const preview = collection.resource ? previews[collection.resource.id] : undefined;
@@ -143,7 +170,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
         </View>
         <View style={s.selectedHeading}><Text style={s.selectedTitle}>{selectedCollection.title.trim()}</Text><Text style={s.resultCount}>{totalProducts ?? products.length} products</Text></View>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.productScroll}>
+        <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll}>
           {loading ? <CollectionCartonLoader /> : <View style={s.productGrid}>
             {visibleProducts.map(product => {
               const variant = product.variants.nodes[0];
@@ -160,7 +187,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                   <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}>
                     <Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={20} color={favoriteIds.has(product.id) ? '#B85C5C' : '#3F72E5'} />
                   </Pressable>
-                <Pressable onPress={availableForSale ? () => onAdd(product) : () => {}} style={[s.imageActionButton, !availableForSale && s.notifyButton]}><Text style={[s.imageActionText, !availableForSale && s.notifyButtonText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
+                <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View>{notifyMessageId === product.id ? <View pointerEvents="none" style={s.notifyToast}><Text style={s.notifyToastText}>We&apos;ll notify you</Text></View> : null}</View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
                 </Pressable>
                 <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}>
@@ -183,7 +210,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           <View style={s.filterHeader}><Text style={s.filterTitle}>Filters</Text><Pressable onPress={() => setFilterVisible(false)}><Ionicons name="close" size={26} color="#1A1C1D" /></Pressable></View>
           <View style={s.filterBody}>
             <Text style={s.filterSectionTitle}>Brand</Text>
-            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={s.brandOptions} contentContainerStyle={s.filterOptionsContent}>
+            <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={s.brandOptions} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.filterOptionsContent}>
               {brands.map(brand => <Pressable key={brand} onPress={() => toggleBrand(brand)} style={s.filterOption}>
                 <View style={[s.checkbox, selectedBrands.has(brand) && s.checkboxSelected]}>{selectedBrands.has(brand) ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}</View>
                 <Text style={s.filterOptionText}>{brand}</Text>
@@ -269,6 +296,10 @@ const s = StyleSheet.create({
   imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   notifyButton: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
   notifyButtonText: { color: '#2E8B36' },
+  notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
+  notifyToast: { position: 'absolute', right: -8, bottom: 29, minWidth: 122, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, alignItems: 'center', backgroundColor: '#1A1C1D', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 5 },
+  notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   heart: { position: 'absolute', top: 7, right: 7 },
   productName: { minHeight: 34, marginTop: 25, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, fontWeight: '700' },
   priceRow: { height: 46, marginTop: 3, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start', alignItems: 'baseline', columnGap: 4, rowGap: 2, overflow: 'hidden' },

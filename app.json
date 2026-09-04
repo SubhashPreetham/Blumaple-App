@@ -11,11 +11,14 @@
       "assets/**/*"
     ],
     "ios": {
+      "icon": "./icon/app_icon.png",
       "supportsTablet": true
     },
     "android": {
+      "icon": "./icon/app_icon.png",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./icon/app_icon.png",
+        "backgroundColor": "#062B61"
       },
       "package": "com.blumaple.app"
     },

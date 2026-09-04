@@ -55,7 +55,7 @@ export function DashboardPage() {
 
   return <View style={s.page}>
     <View style={s.header}><View><Text style={s.eyebrow}>BLUMAPLE ADMIN</Text><Text style={s.title}>Carousel dashboard</Text><Text style={s.subtitle}>Build and organise each menu carousel.</Text></View><View style={s.status}><View style={s.statusDot}/><Text style={s.statusText}>Local browser mode</Text></View></View>
-    <ScrollView contentContainerStyle={s.body}>
+    <ScrollView contentContainerStyle={s.body} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.menuRow}>{menus.map(menu => <Pressable key={menu} onPress={() => setSelectedMenu(menu)} style={[s.menuButton, selectedMenu === menu && s.menuButtonActive]}><Text style={[s.menuText, selectedMenu === menu && s.menuTextActive]}>{menu}</Text></Pressable>)}</ScrollView>
       <View style={s.panelHeader}><View><Text style={s.panelTitle}>{selectedMenu} carousel</Text><Text style={s.panelCopy}>Add as many carousel slides as you need. Each slide can be linked to a collection later.</Text></View><Text style={s.count}>{slides.length} slides</Text></View>
       <View style={s.slideList}>{slides.map((slide, index) => <View key={slide.id} style={s.slideCard}>

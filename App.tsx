@@ -9,8 +9,10 @@ import {
   Image,
   ImageSourcePropType,
   Keyboard,
+  LayoutAnimation,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -18,6 +20,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -51,6 +54,8 @@ const palette = {
   white: '#FFFFFF',
 };
 
+const SEARCH_PLACEHOLDERS = ['Watches', 'Cameras', 'Headphones', 'Radios', 'Mobile Cases', 'Tumblers', 'Computer Peripharels', 'System Components'];
+
 const BOTTOM_NAV_HEIGHT = 70;
 const FLOATING_CART_GAP = 12;
 const FLOATING_CART_HEIGHT = 58;
@@ -58,6 +63,10 @@ const FLOATING_CONTROL_GAP = 12;
 const WISHLIST_ACTIVE_COLOR = '#B85C5C';
 const homeChrome = '#D3DDEA';
 const footerDiscountTag = require('./assets/ui/offers.png');
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Product = {
   id: string;
@@ -202,8 +211,44 @@ function parseTechSpecTable(value?: string) {
   }).filter(([heading, detail]) => heading || detail);
 }
 
+function useNotifyConfirmation() {
+  const [notified, setNotified] = useState(false);
+  const [showMessage, setShowMessage] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  const notify = () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (notified) {
+      setNotified(false);
+      setShowMessage(false);
+      timer.current = null;
+      return;
+    }
+    setNotified(true);
+    setShowMessage(true);
+    timer.current = setTimeout(() => {
+      setShowMessage(false);
+      timer.current = null;
+    }, 1000);
+  };
+
+  return { notified, showMessage, notify };
+}
+
+function NotifyConfirmation({ notified, showMessage, color = '#2E8B36' }: { notified: boolean; showMessage: boolean; color?: string }) {
+  return <>
+    {notified ? <View style={styles.notifyIconWrap}><Ionicons name="notifications" size={18} color={color} /><View style={styles.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={[styles.collectionImageActionText, { color }]}>NOTIFY</Text>}
+    {showMessage ? <View pointerEvents="none" style={styles.notifyToast}><Text style={styles.notifyToastText}>We&apos;ll notify you</Text></View> : null}
+  </>;
+}
+
 function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFavorite = true, collectionLayout = false }: { item: Product; width: number; favorite: boolean; onFavorite: () => void; onAdd: () => void; onOpen?: () => void; showFavorite?: boolean; collectionLayout?: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const notifyConfirmation = useNotifyConfirmation();
   useEffect(() => setImageFailed(false), [item.image]);
   if (collectionLayout) {
     const availableForSale = item.availableForSale ?? true;
@@ -213,7 +258,7 @@ function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFav
         {imageFailed ? <Ionicons name="image-outline" size={34} color="#A7B0BC" /> : <Image source={item.image} style={[styles.collectionProductImage, !availableForSale && styles.collectionUnavailable]} resizeMode="contain" onError={() => setImageFailed(true)} />}
         {!availableForSale ? <View style={styles.collectionComingSoon}><Text style={styles.collectionComingSoonText}>Coming soon</Text></View> : discountLabel ? <View style={styles.collectionDiscountBadge}><Text style={styles.collectionDiscountText}>{discountLabel}</Text></View> : null}
         {showFavorite ? <Pressable hitSlop={10} onPress={onFavorite} style={styles.collectionHeart}><Ionicons name={favorite ? 'heart' : 'heart-outline'} size={21} color={favorite ? WISHLIST_ACTIVE_COLOR : palette.blue} /></Pressable> : null}
-        <Pressable onPress={availableForSale ? onAdd : () => {}} style={[styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction]}><Text style={[styles.collectionImageActionText, !availableForSale && styles.collectionNotifyText]}>{availableForSale ? 'ADD' : 'NOTIFY'}</Text></Pressable>
+        <Pressable onPress={availableForSale ? onAdd : notifyConfirmation.notify} style={[styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction]}>{availableForSale ? <Text style={styles.collectionImageActionText}>ADD</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} />}</Pressable>
       </Pressable>
       <Text numberOfLines={2} style={[styles.collectionProductName, !availableForSale && styles.collectionUnavailable]}>{item.name}</Text>
       <View style={[styles.collectionPriceRow, !availableForSale && styles.collectionUnavailable]}><Text style={[styles.collectionPrice, item.oldPrice && styles.collectionSalePrice]}>{item.price}</Text>{item.oldPrice ? <Text numberOfLines={1} style={styles.collectionOldPrice}>{item.oldPrice}</Text> : null}</View>
@@ -242,6 +287,25 @@ function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFav
 
 function SectionTitle({ children }: React.PropsWithChildren) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
+}
+
+function RotatingSearchIcon({ size = 24 }: { size?: number }) {
+  const orbit = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(Animated.timing(orbit, {
+      toValue: 1,
+      duration: 1100,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }));
+    animation.start();
+    return () => animation.stop();
+  }, [orbit]);
+
+  const translateX = orbit.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [-9, 0, 9, 0, -9] });
+  const translateY = orbit.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -6, 0, 6, 0] });
+  return <Animated.View style={{ transform: [{ translateX }, { translateY }] }}><Ionicons name="search-outline" size={size} color={palette.blue} /></Animated.View>;
 }
 
 function CartonBoxLoader({ size = 46 }: { size?: number }) {
@@ -295,6 +359,7 @@ const detailColors = [
 ];
 
 function ProductDetail({ width, cartCount, product, recommendations, favoriteIds, onBack, onAdd, onCheckout, onOpenProduct, onFavorite }: { width: number; cartCount: number; product: Product; recommendations: Product[]; favoriteIds: Set<string>; onBack: () => void; onAdd: (product: Product) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onFavorite: (product: Product) => void }) {
+  const notifyConfirmation = useNotifyConfirmation();
   const [colorIndex, setColorIndex] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -364,9 +429,9 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
   };
 
   return <View style={[styles.detailPage, { width }]}>
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailContent}>
+    <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={styles.detailContent}>
       <View style={styles.detailHeroSection}>
-        <ScrollView ref={detailGalleryRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} bounces={false} style={styles.detailGallery} onMomentumScrollEnd={event => setColorIndex(Math.round(event.nativeEvent.contentOffset.x / width))}>
+        <ScrollView ref={detailGalleryRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} style={styles.detailGallery} onMomentumScrollEnd={event => setColorIndex(Math.round(event.nativeEvent.contentOffset.x / width))}>
           {choices.map((option, index) => <Image key={`hero-${option.name}-${index}`} source={option.image} style={[styles.detailHero, { width }]} resizeMode="contain" />)}
         </ScrollView>
         <View style={styles.detailOverlayHeader}>
@@ -375,7 +440,7 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
         </View>
         <View style={styles.detailDots}>{choices.map((_, i) => <View key={i} style={[styles.detailDot, i === colorIndex && styles.detailDotActive]} />)}</View>
       </View>
-      {choices.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailThumbnailScroller} contentContainerStyle={styles.detailThumbnails}>{choices.map((option, index) => <Pressable key={`${option.name}-${index}`} onPress={() => { setColorIndex(index); detailGalleryRef.current?.scrollTo({ x: index * width, animated: true }); }} style={[styles.detailThumbnail, index === colorIndex && styles.detailThumbnailActive]}><Image source={option.image} style={styles.swatchImage} resizeMode="contain" /></Pressable>)}</ScrollView> : null}
+      {choices.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} style={styles.detailThumbnailScroller} contentContainerStyle={styles.detailThumbnails}>{choices.map((option, index) => <Pressable key={`${option.name}-${index}`} onPress={() => { setColorIndex(index); detailGalleryRef.current?.scrollTo({ x: index * width, animated: true }); }} style={[styles.detailThumbnail, index === colorIndex && styles.detailThumbnailActive]}><Image source={option.image} style={styles.swatchImage} resizeMode="contain" /></Pressable>)}</ScrollView> : null}
       <View style={styles.detailInfoCard}>
         <Text style={styles.detailTitle}>{product.name}</Text>
         <View style={styles.detailPriceRow}><Text style={styles.detailPrice}>{product.price}</Text>{product.oldPrice ? <Text style={styles.detailOldPrice}>{product.oldPrice}</Text> : null}{detailDiscountLabel ? <Text style={styles.detailDiscount}>{detailDiscountLabel}</Text> : null}</View>
@@ -407,9 +472,9 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
       </View>
       <Text style={styles.similarTitle}>You may also like</Text>
       <Text style={styles.similarSubtitle}>Combine your style with these products</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.detailRecommendations}>{recommendations.filter(item => item.id !== product.id).slice(0, 12).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={150} favorite={favoriteIds.has(item.id)} collectionLayout onFavorite={() => onFavorite(item)} onAdd={() => onAdd(item)} onOpen={() => onOpenProduct(item)} />)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.detailRecommendations}>{recommendations.filter(item => item.id !== product.id).slice(0, 12).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={150} favorite={favoriteIds.has(item.id)} collectionLayout onFavorite={() => onFavorite(item)} onAdd={() => onAdd(item)} onOpen={() => onOpenProduct(item)} />)}</ScrollView>
     </ScrollView>
-    <View style={styles.buyBar}><View><Text style={styles.buyBarPrice}>{floatingTotal}</Text><Text style={styles.buyBarTax}>Inclusive of all taxes</Text></View><Pressable onPress={availableForSale ? () => onAdd(product) : () => {}} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}><Text style={styles.addLargeText}>{availableForSale ? 'Add to cart' : 'Notify me'}</Text></Pressable></View>
+    <View style={styles.buyBar}><View><Text style={styles.buyBarPrice}>{floatingTotal}</Text><Text style={styles.buyBarTax}>Inclusive of all taxes</Text></View><Pressable onPress={availableForSale ? () => onAdd(product) : notifyConfirmation.notify} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}>{availableForSale ? <Text style={styles.addLargeText}>Add to cart</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#FFFFFF" />}</Pressable></View>
     <Modal visible={shareVisible} transparent animationType="slide" onRequestClose={() => setShareVisible(false)}>
       <Pressable style={styles.shareBackdrop} onPress={() => setShareVisible(false)}><Pressable style={styles.shareSheet} onPress={() => {}}>
         <View style={styles.shareSheetHeader}><Text style={styles.shareSheetTitle}>Share product</Text><Pressable onPress={() => setShareVisible(false)}><Ionicons name="close" size={23} color={palette.ink} /></Pressable></View>
@@ -430,6 +495,7 @@ function CartPopup({ item, count, onOpen, containerStyle }: { item: Product | nu
 
 function WishlistCard({ item, width, onOpen, onRemove, onAdd }: { item: Product; width: number; onOpen: () => void; onRemove?: () => void; onAdd: () => void }) {
   const available = item.availableForSale !== false;
+  const notifyConfirmation = useNotifyConfirmation();
   return <View style={[styles.wishlistCard, { width }]}> 
     <Pressable onPress={onOpen} style={styles.wishlistProductLink}>
       <View style={styles.wishlistImageFrame}><Image source={item.image} style={styles.wishlistImage} resizeMode="contain" />{item.discount ? <View style={styles.wishlistDiscountBadge}><Text style={styles.wishlistDiscountBadgeText}>{item.discount}</Text></View> : null}</View>
@@ -439,7 +505,7 @@ function WishlistCard({ item, width, onOpen, onRemove, onAdd }: { item: Product;
         {item.oldPrice ? <Text numberOfLines={1} style={styles.wishlistOldPrice}>{item.oldPrice}</Text> : null}
       </View>
     </Pressable>
-    <Pressable onPress={available ? onAdd : () => Alert.alert('Notify me', `We’ll let you know when ${item.name} is available.`)} style={[styles.wishlistAddButton, !available && styles.wishlistNotifyButton]}><Ionicons name={available ? 'cart-outline' : 'notifications-outline'} size={17} color="#FFFFFF" /><Text style={styles.wishlistAddText}>{available ? 'Add to cart' : 'Notify'}</Text></Pressable>
+    <Pressable onPress={available ? onAdd : notifyConfirmation.notify} style={[styles.wishlistAddButton, !available && styles.wishlistNotifyButton]}>{available ? <><Ionicons name="cart-outline" size={17} color="#FFFFFF" /><Text style={styles.wishlistAddText}>Add to cart</Text></> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#FFFFFF" />}</Pressable>
     {onRemove ? <Pressable onPress={onRemove} style={styles.wishlistRemoveButton}><Ionicons name="trash-outline" size={16} color={palette.red} /><Text style={styles.wishlistRemoveText}>Remove</Text></Pressable> : null}
   </View>;
 }
@@ -488,7 +554,7 @@ function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout,
   const cartTotalText = money(String(cartTotal), items[0]?.product.currencyCode ?? 'INR');
   return <View style={styles.cartPage}>
     <View style={styles.cartPageHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.cartBackButton}><Ionicons name="arrow-back" size={23} color={palette.white} /></Pressable><Text style={styles.cartPageTitle}>My Cart</Text></View>
-    {items.length ? <ScrollView contentContainerStyle={styles.cartList} showsVerticalScrollIndicator={false}>{items.map(({ product, quantity }) => <View key={product.id} style={styles.cartListItem}>
+    {items.length ? <ScrollView contentContainerStyle={styles.cartList} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">{items.map(({ product, quantity }) => <View key={product.id} style={styles.cartListItem}>
       <Image source={product.image} style={styles.cartListImage} resizeMode="contain" />
       <View style={styles.cartListCopy}><Text numberOfLines={3} style={styles.cartListName}>{product.name}</Text><Text style={styles.cartListPrice}>{product.price}</Text></View>
       <View style={styles.cartListActions}><View style={styles.cartQuantityControl}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, -1)}><Text style={styles.cartQuantityButton}>−</Text></Pressable><Text style={styles.cartQuantityValue}>{quantity}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, 1)}><Text style={styles.cartQuantityButton}>+</Text></Pressable></View></View>
@@ -521,6 +587,9 @@ function Storefront() {
   const [categoryCollectionReturnScreen, setCategoryCollectionReturnScreen] = useState<'home' | 'categories' | 'offers'>('home');
   const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'collection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchPlaceholderIndex, setSearchPlaceholderIndex] = useState(0);
+  const searchPlaceholderY = useRef(new Animated.Value(0)).current;
+  const searchPlaceholderOpacity = useRef(new Animated.Value(1)).current;
   const [submittedSearch, setSubmittedSearch] = useState('');
   const [remoteSearchProducts, setRemoteSearchProducts] = useState<Product[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -572,6 +641,34 @@ function Storefront() {
   const orderDetailsScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
+    const rotatePlaceholder = () => {
+      Animated.parallel([
+        Animated.timing(searchPlaceholderY, { toValue: -12, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(searchPlaceholderOpacity, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (!finished) return;
+        setSearchPlaceholderIndex(current => (current + 1) % SEARCH_PLACEHOLDERS.length);
+        requestAnimationFrame(() => {
+          searchPlaceholderY.setValue(12);
+          searchPlaceholderOpacity.setValue(0);
+          requestAnimationFrame(() => {
+            Animated.parallel([
+              Animated.timing(searchPlaceholderY, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+              Animated.timing(searchPlaceholderOpacity, { toValue: 1, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]).start();
+          });
+        });
+      });
+    };
+    const interval = setInterval(rotatePlaceholder, 2000);
+    return () => {
+      clearInterval(interval);
+      searchPlaceholderY.stopAnimation();
+      searchPlaceholderOpacity.stopAnimation();
+    };
+  }, [searchPlaceholderOpacity, searchPlaceholderY]);
+
+  useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (screen === 'home') return false;
       if (screen === 'orderSuccess') { setScreen('home'); return true; }
@@ -619,7 +716,7 @@ function Storefront() {
   const storefrontEntranceProgress = useRef(new Animated.Value(0)).current;
   const pincodeModalProgress = useRef(new Animated.Value(0)).current;
   const profileEntranceProgress = useRef(new Animated.Value(0)).current;
-  const backRevealProgress = useRef(new Animated.Value(1)).current;
+  const suppressHomeEntranceRef = useRef(false);
   const homeSearchEntrance = useRef(new Animated.Value(0)).current;
   const homeCarouselEntrance = useRef(new Animated.Value(0)).current;
   const homeCategoryEntrance = useRef(new Animated.Value(0)).current;
@@ -656,8 +753,8 @@ function Storefront() {
   const pincodeModalScale = pincodeModalProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
   const pincodeModalTranslateY = pincodeModalProgress.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
   const profileEntranceOpacity = profileEntranceProgress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.35, 1] });
-  const backRevealOpacity = backRevealProgress.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] });
-  const backRevealTranslateX = backRevealProgress.interpolate({ inputRange: [0, 1], outputRange: [-34, 0] });
+  const backRevealOpacity = 1;
+  const backRevealTranslateX = 0;
   const homeHeaderHeight = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') ? 126 : 82, 0] });
   const homeHeaderOpacity = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const homeFooterTranslateY = browseFooterProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 74] });
@@ -974,6 +1071,11 @@ function Storefront() {
 
   useEffect(() => {
     const sections = [homeSearchEntrance, homeCarouselEntrance, homeCategoryEntrance, homeTrendingEntrance, homeBestSellingEntrance];
+    if (screen === 'home' && suppressHomeEntranceRef.current) {
+      sections.forEach(section => section.setValue(1));
+      suppressHomeEntranceRef.current = false;
+      return;
+    }
     sections.forEach(section => section.setValue(0));
     if (screen !== 'home' || footerPageTransitioning || openingAnimationVisible || customerAuth.loading || (!customerAuth.isLoggedIn && !initialLoginSkipped) || checkoutLoginRequired) return;
     const entranceAnimation = Animated.stagger(95, sections.map(section => Animated.timing(section, {
@@ -1137,14 +1239,14 @@ function Storefront() {
   };
 
   const navigateBack = (target: typeof screen) => {
-    backRevealProgress.setValue(0);
+    if (target === 'home') suppressHomeEntranceRef.current = true;
+    LayoutAnimation.configureNext({
+      duration: 360,
+      create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
     setScreen(target);
-    requestAnimationFrame(() => Animated.timing(backRevealProgress, {
-      toValue: 1,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start());
   };
 
   const returnFromCart = () => {
@@ -1273,11 +1375,12 @@ function Storefront() {
   }
 
   if (checkoutLoginRequired && !customerAuth.isLoggedIn) {
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><RequiredLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} /></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><RequiredLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onClose={() => { setCheckoutLoginRequired(false); setScreen('cart'); }} /></SafeAreaView>;
   }
 
   if (screen === 'categoryCollection' && selectedCategoryGroup && selectedCollectionItem) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
     <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
+    <Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}>
     <CategoryCollectionPage
       category={selectedCategoryGroup}
       selectedCollection={selectedCollectionItem}
@@ -1302,6 +1405,7 @@ function Storefront() {
     />
     <HelpFab cartBottom={floatingCartBottom} />
     {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={[styles.collectionCartPopupLayer, { paddingBottom: floatingCartBottom }]} /> : null}
+    </Animated.View>
   </SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
@@ -1326,23 +1430,26 @@ function Storefront() {
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
 
-  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => navigateBack('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></SafeAreaView>;
+  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => navigateBack('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></Animated.View></SafeAreaView>;
 
-  if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><AddressPage onBack={() => navigateBack('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></SafeAreaView>;
+  if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><AddressPage onBack={() => navigateBack('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></Animated.View></SafeAreaView>;
 
   if (screen === 'search') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
     <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
+    <Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}>
     <View style={styles.searchResultsHeader}><Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color="#FFFFFF" /></Pressable><View style={styles.searchResultsHeaderCopy}><Text style={styles.searchResultsHeaderTitle}>Search Results</Text><Text style={styles.searchResultsHeaderSubtitle}>Results for “{submittedSearch}”</Text></View><View style={{ width: 24 }} /></View>
-    <ScrollView style={styles.searchResultsPage} contentContainerStyle={styles.searchResultsContent} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.searchResultsPage} contentContainerStyle={styles.searchResultsContent} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">
       <View style={styles.wishlistHeadingBlock}><Text style={styles.wishlistHeading}>Search Results</Text><Text style={styles.wishlistCount}>{displayedSearchResults.length} products</Text></View>
       <View style={styles.searchControls}><Pressable onPress={() => setSearchFilterVisible(true)} style={[styles.searchControl, searchFilterCount > 0 && styles.searchControlActive]}><Ionicons name="options-outline" size={18} color={searchFilterCount ? '#FFFFFF' : palette.ink} /><Text numberOfLines={1} style={[styles.searchControlText, searchFilterCount > 0 && styles.searchControlTextActive]}>Filters{searchFilterCount ? ` (${searchFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={searchFilterCount ? '#FFFFFF' : palette.ink} /></Pressable><Pressable onPress={() => setSearchSort(current => current === 'Recommended' ? 'Price: Low' : current === 'Price: Low' ? 'Price: High' : current === 'Price: High' ? 'Name' : 'Recommended')} style={styles.searchControl}><Ionicons name="swap-vertical" size={18} color={palette.ink} /><Text numberOfLines={1} style={styles.searchControlText}>Sort: {searchSort}</Text><Ionicons name="chevron-down" size={15} color={palette.ink} /></Pressable></View>
-      {searchLoading ? <View style={styles.wishlistEmpty}><ActivityIndicator size="large" color={palette.blue} /><Text style={styles.wishlistEmptyCopy}>Searching products…</Text></View> : searchError ? <View style={styles.wishlistEmpty}><Ionicons name="cloud-offline-outline" size={52} color={palette.red} /><Text style={styles.wishlistEmptyTitle}>Search failed</Text><Text style={styles.wishlistEmptyCopy}>{searchError}</Text></View> : displayedSearchResults.length ? <View style={styles.searchResultList}>{displayedSearchResults.map(item => <Pressable key={`search-${item.id}`} onPress={() => openProduct(item)} style={styles.searchResultRow}><Image source={item.image} style={styles.searchResultImage} resizeMode="contain" /><View style={styles.searchResultCopy}><Text numberOfLines={2} style={styles.searchResultTitle}>{item.name}</Text><Text style={styles.searchResultPrice}>{item.price}</Text></View><Ionicons name="chevron-forward" size={20} color={palette.blue} /></Pressable>)}{searchHasNextPage ? <Pressable disabled={searchLoadingMore} onPress={loadMoreSearchResults} style={[styles.searchLoadMore, searchLoadingMore && styles.searchLoadMoreDisabled]}>{searchLoadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.searchLoadMoreText}>Load more</Text>}</Pressable> : null}</View> : <View style={styles.wishlistEmpty}><Ionicons name="search-outline" size={52} color={palette.blue} /><Text style={styles.wishlistEmptyTitle}>No matching products</Text><Text style={styles.wishlistEmptyCopy}>Try another stock filter or keyword.</Text></View>}
+      {searchLoading ? <View style={styles.wishlistEmpty}><RotatingSearchIcon size={34} /></View> : searchError ? <View style={styles.wishlistEmpty}><Ionicons name="cloud-offline-outline" size={52} color={palette.red} /><Text style={styles.wishlistEmptyTitle}>Search failed</Text><Text style={styles.wishlistEmptyCopy}>{searchError}</Text></View> : displayedSearchResults.length ? <View style={styles.searchResultList}>{displayedSearchResults.map(item => <Pressable key={`search-${item.id}`} onPress={() => openProduct(item)} style={styles.searchResultRow}><Image source={item.image} style={styles.searchResultImage} resizeMode="contain" /><View style={styles.searchResultCopy}><Text numberOfLines={2} style={styles.searchResultTitle}>{item.name}</Text><Text style={styles.searchResultPrice}>{item.price}</Text></View><Ionicons name="chevron-forward" size={20} color={palette.blue} /></Pressable>)}{searchHasNextPage ? <Pressable disabled={searchLoadingMore} onPress={loadMoreSearchResults} style={[styles.searchLoadMore, searchLoadingMore && styles.searchLoadMoreDisabled]}>{searchLoadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.searchLoadMoreText}>Load more</Text>}</Pressable> : null}</View> : <View style={styles.wishlistEmpty}><Ionicons name="search-outline" size={52} color={palette.blue} /><Text style={styles.wishlistEmptyTitle}>No matching products</Text><Text style={styles.wishlistEmptyCopy}>Try another stock filter or keyword.</Text></View>}
     </ScrollView>
     <Modal visible={searchFilterVisible} transparent animationType="slide" onRequestClose={() => setSearchFilterVisible(false)}><Pressable style={styles.searchFilterBackdrop} onPress={() => setSearchFilterVisible(false)}><Pressable style={styles.searchFilterSheet} onPress={() => {}}><View style={styles.searchFilterHeader}><Text style={styles.searchFilterTitle}>Filters</Text><Pressable onPress={() => setSearchFilterVisible(false)}><Ionicons name="close" size={26} color={palette.heading} /></Pressable></View><View style={styles.searchFilterBody}><View style={styles.searchFilterPanel}><Text style={styles.searchFilterSection}>Brand</Text><ScrollView nestedScrollEnabled style={styles.searchFilterOptions} contentContainerStyle={styles.searchFilterOptionsContent} showsVerticalScrollIndicator>{searchBrandOptions.map(option => <Pressable key={`brand-${option}`} onPress={() => toggleSearchFilter(option, 'brand')} style={styles.searchFilterOption}><View style={[styles.searchCheckbox, searchBrands.has(option) && styles.searchCheckboxActive]}>{searchBrands.has(option) ? <Ionicons name="checkmark" size={15} color="#FFFFFF" /> : null}</View><Text style={styles.searchFilterOptionText}>{option}</Text></Pressable>)}{!searchBrandOptions.length ? <Text style={styles.searchFilterEmpty}>No brand information available.</Text> : null}</ScrollView></View><View style={styles.searchFilterDivider} /><View style={styles.searchFilterPanel}><Text style={styles.searchFilterSection}>Shipping (Vendor)</Text><ScrollView nestedScrollEnabled style={styles.searchFilterOptions} contentContainerStyle={styles.searchFilterOptionsContent} showsVerticalScrollIndicator>{searchVendorOptions.map(option => <Pressable key={`vendor-${option}`} onPress={() => toggleSearchFilter(option, 'vendor')} style={styles.searchFilterOption}><View style={[styles.searchCheckbox, searchVendors.has(option) && styles.searchCheckboxActive]}>{searchVendors.has(option) ? <Ionicons name="checkmark" size={15} color="#FFFFFF" /> : null}</View><Text style={styles.searchFilterOptionText}>{option}</Text></Pressable>)}{!searchVendorOptions.length ? <Text style={styles.searchFilterEmpty}>No shipping information available.</Text> : null}</ScrollView></View></View><View style={styles.searchFilterActions}><Pressable onPress={() => { setSearchBrands(new Set()); setSearchVendors(new Set()); }} style={styles.searchClearButton}><Text style={styles.searchClearText}>Clear all</Text></Pressable><Pressable onPress={() => setSearchFilterVisible(false)} style={styles.searchApplyButton}><Text style={styles.searchApplyText}>Show {displayedSearchResults.length} products</Text></Pressable></View></Pressable></Pressable></Modal>
+    </Animated.View>
   </SafeAreaView>;
 
   if (screen === 'profile') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
     <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
+    <Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}>
     <View style={styles.profileHeader}>
       <Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable>
       <View style={styles.profileHeaderCopy}><Text style={styles.profileHeaderTitle}>My Profile</Text><Text style={styles.profileHeaderSubtitle}>Account, support and policies</Text></View>
@@ -1350,6 +1457,7 @@ function Storefront() {
     </View>
     <Animated.View style={[styles.profileEntrance, { opacity: profileEntranceOpacity }]}>
       <ProfilePage customer={customerAuth.customer} onLogout={() => { void customerAuth.logout(); setInitialLoginSkipped(false); setCheckoutLoginRequired(false); setScreen('home'); }} />
+    </Animated.View>
     </Animated.View>
   </SafeAreaView>;
 
@@ -1385,7 +1493,10 @@ function Storefront() {
         {screen === 'home' && <Animated.View style={[styles.staticSearchZone, styles.homeHeroSurface, { opacity: homeSearchEntrance, transform: [{ translateY: homeSearchTranslateY }] }]}>
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={20} color={palette.ink} />
-            <TextInput value={searchQuery} onChangeText={setSearchQuery} onFocus={() => setKeyboardVisible(true)} onBlur={() => setKeyboardVisible(false)} onSubmitEditing={submitSearch} returnKeyType="search" placeholder="Search for products, brands and more" placeholderTextColor="#9B9B9B" style={styles.searchInput} />
+            <View style={styles.searchInputWrap}>
+              {!searchQuery ? <Animated.Text pointerEvents="none" style={[styles.searchAnimatedPlaceholder, { opacity: searchPlaceholderOpacity, transform: [{ translateY: searchPlaceholderY }] }]}>{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}</Animated.Text> : null}
+              <TextInput value={searchQuery} onChangeText={setSearchQuery} onFocus={() => setKeyboardVisible(true)} onBlur={() => setKeyboardVisible(false)} onSubmitEditing={submitSearch} returnKeyType="search" style={styles.searchInput} />
+            </View>
           </View>
         </Animated.View>}
 
@@ -1393,8 +1504,10 @@ function Storefront() {
           key={screen}
           style={{ backgroundColor: activeFooterTab === 'home' ? '#0A254A' : palette.white }}
           showsVerticalScrollIndicator={false}
-          bounces={false}
-          overScrollMode="never"
+          bounces
+          alwaysBounceVertical
+          decelerationRate="normal"
+          overScrollMode="auto"
           contentContainerStyle={[styles.content, collapseBrowseChrome && styles.browseContent]}
           onLayout={event => { browseViewportHeightRef.current = event.nativeEvent.layout.height; }}
           onContentSizeChange={(_, height) => {
@@ -1577,7 +1690,7 @@ function Storefront() {
             </View>
           </>}
         </Animated.ScrollView>
-        {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><ActivityIndicator size="small" color={palette.blue} /><Text style={styles.searchNoSuggestions}>Searching…</Text></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
+        {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><RotatingSearchIcon /></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
         <Animated.View style={[styles.floatingFooter, collapseBrowseChrome && { opacity: homeFooterOpacity, transform: [{ translateY: homeFooterTranslateY }] }]}> 
           <Pressable onPress={() => openFooterPage('home')} style={[styles.footerTab, activeFooterTab === 'home' && styles.footerTabSelected]}>
             <Ionicons name={activeFooterTab === 'home' ? 'home' : 'home-outline'} size={25} color={activeFooterTab === 'home' ? palette.blue : palette.muted} />
@@ -1617,7 +1730,7 @@ function Storefront() {
           <Pressable style={StyleSheet.absoluteFillObject} onPress={closeHistoryOrder} />
           <View style={styles.orderDetailsSheet}>
             <View style={styles.orderDetailsHeader}><Text style={styles.orderDetailsTitle}>Order details</Text><Pressable onPress={closeHistoryOrder}><Ionicons name="close" size={25} color={palette.heading} /></Pressable></View>
-            <ScrollView ref={orderDetailsScrollRef} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" decelerationRate="normal" contentContainerStyle={styles.orderDetailsContent}>
+            <ScrollView ref={orderDetailsScrollRef} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={styles.orderDetailsContent}>
             <View style={styles.orderKeyValueBlock}>
               <View style={styles.orderKeyValueRow}><Text style={styles.orderDetailKey}>Order ID</Text><Text style={styles.orderDetailValue}>{selectedHistoryOrder?.id}</Text></View>
               <View style={styles.orderKeyValueRow}><Text style={styles.orderDetailKey}>Order date</Text><Text style={styles.orderDetailValue}>{selectedHistoryOrder?.date}</Text></View>
@@ -1752,6 +1865,8 @@ const styles = StyleSheet.create({
   zigzagTooth: { width: 16, height: 16, marginHorizontal: 1, marginTop: 6, backgroundColor: palette.white, transform: [{ rotate: '45deg' }] },
   staticSearchZone: { paddingTop: 0, paddingBottom: 8, overflow: 'visible', backgroundColor: homeChrome, zIndex: 100, elevation: 20 },
   searchBox: { height: 50, marginHorizontal: 16, borderWidth: 1, borderColor: '#AEB7C3', borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
+  searchInputWrap: { flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' },
+  searchAnimatedPlaceholder: { position: 'absolute', left: 0, color: '#9B9B9B', fontFamily: 'Inter_400Regular', fontSize: 12 },
   searchInput: { flex: 1, padding: 0, fontFamily: 'Inter_400Regular', fontSize: 12, color: palette.ink },
   searchSuggestions: { position: 'absolute', left: 28, right: 28, top: 174, overflow: 'hidden', zIndex: 500, borderWidth: 1, borderColor: '#D5DBE3', borderRadius: 10, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 50 },
   searchSuggestionLoading: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
@@ -1846,7 +1961,7 @@ const styles = StyleSheet.create({
   categoryLabelActive: { color: palette.blue },
   banner: { height: 116, borderRadius: 9, marginRight: 10, borderWidth: 1, borderColor: 'rgba(0,0,0,0.09)' },
   dots: { height: 21, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
-  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#B33C52' },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
   dotActive: { width: 4, backgroundColor: palette.blue },
   sectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   productCard: { marginBottom: 15 },
@@ -1863,6 +1978,10 @@ const styles = StyleSheet.create({
   collectionImageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   collectionNotifyAction: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
   collectionNotifyText: { color: '#2E8B36' },
+  notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
+  notifyToast: { position: 'absolute', right: 0, bottom: '100%', minWidth: 122, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, alignItems: 'center', backgroundColor: '#1A1C1D', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 5 },
+  notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   collectionProductName: { minHeight: 34, marginTop: 25, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, fontWeight: '700' },
   collectionPriceRow: { height: 46, marginTop: 3, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start', alignItems: 'baseline', columnGap: 4, rowGap: 2, overflow: 'hidden' },
   collectionPrice: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
@@ -2085,7 +2204,7 @@ const styles = StyleSheet.create({
   footerTabActive: { color: palette.blue, fontWeight: '700' },
   offersFooterTab: { paddingHorizontal: 3 },
   offersFooterBadge: { alignSelf: 'stretch', height: 60, alignItems: 'center', justifyContent: 'center' },
-  offersFooterImage: { width: 52, height: 52, shadowColor: '#9D1E1E', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.24, shadowRadius: 4, elevation: 4 },
+  offersFooterImage: { width: 42, height: 42, shadowColor: '#9D1E1E', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.24, shadowRadius: 4, elevation: 4 },
   detailPage: { flex: 1, alignSelf: 'center', backgroundColor: '#F4F5FA' },
   detailContent: { paddingBottom: 0 },
   detailHeroSection: { height: 310, backgroundColor: '#FFFFFF' },
@@ -2162,7 +2281,7 @@ const styles = StyleSheet.create({
   buyBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5', borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3' },
   buyBarPrice: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
   buyBarTax: { marginTop: 2, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 10 },
-  addLarge: { width: '56%', height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  addLarge: { width: '56%', height: 46, borderRadius: 10, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
   notifyLarge: { backgroundColor: '#2E8B36' },
   addLargeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
   shareBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.42)' },

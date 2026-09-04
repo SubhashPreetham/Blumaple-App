@@ -24,7 +24,7 @@ export function OrderResultPage({ success, orderId, items, address, paymentMetho
   };
   return <View style={s.page}>
     <View style={[s.header, { backgroundColor: '#0A254A', borderColor: '#294565' }]}><Pressable onPress={onHome} hitSlop={10}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable><Text style={[s.headerTitle, { color: '#FFFFFF' }]}>ORDER DETAILS</Text><View style={s.spacer} /></View>
-    <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">
       <View style={[s.icon, success ? s.successIcon : s.failIcon]}><Ionicons name={success ? 'checkmark' : 'close'} size={36} color="#FFFFFF" /></View>
       <Text style={s.heading}>{heading}</Text>
       <Text style={s.subtitle}>{success ? 'Your order has been placed successfully.' : 'We could not place your order. No order has been created.'}</Text>
