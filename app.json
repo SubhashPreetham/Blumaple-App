@@ -4,6 +4,7 @@
     "slug": "blumaple-mobile",
     "scheme": "shop.88771821938.blumaple",
     "version": "1.0.0",
+    "icon": "./icon/app_icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
@@ -15,13 +16,19 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.blumaple.app"
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "04fa6950-7f8a-4a68-a470-b319157ea453"
+      }
+    }
   }
 }
