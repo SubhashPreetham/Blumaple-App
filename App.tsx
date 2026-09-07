@@ -1669,7 +1669,7 @@ function Storefront() {
       </Animated.View>
       <Modal visible={pincodeModalVisible} transparent animationType="none" onRequestClose={closePincodeModal}>
         <Animated.View style={[styles.modalBackdrop, { opacity: pincodeModalProgress }]}>
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={closePincodeModal} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={closePincodeModal} />
           <Animated.View style={{ transform: [{ translateY: pincodeModalTranslateY }, { scale: pincodeModalScale }] }}><Pressable style={styles.pincodeModal} onPress={() => {}}>
             <Text style={styles.pincodeTitle}>Check delivery availability</Text>
             <Text style={styles.pincodeCopy}>Enter your pincode to see whether delivery is available in your area.</Text>
@@ -1681,7 +1681,7 @@ function Storefront() {
       </Modal>
       <Modal visible={Boolean(selectedHistoryOrder)} transparent animationType="slide" onRequestClose={closeHistoryOrder}>
         <View style={styles.orderModalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={closeHistoryOrder} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeHistoryOrder} />
           <View style={styles.orderDetailsSheet}>
             <View style={styles.orderDetailsHeader}><Text style={styles.orderDetailsTitle}>Order details</Text><Pressable onPress={closeHistoryOrder}><Ionicons name="close" size={25} color={palette.heading} /></Pressable></View>
             <ScrollView ref={orderDetailsScrollRef} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={styles.orderDetailsContent}>
@@ -1753,7 +1753,7 @@ const styles = StyleSheet.create({
   backRevealPage: { flex: 1 },
   homeEntranceBackground: { backgroundColor: '#0A254A' },
   loginEntrance: { flex: 1 },
-  openingAnimationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 100, overflow: 'hidden', alignItems: 'center', backgroundColor: '#0A254A' },
+  openingAnimationOverlay: { ...StyleSheet.absoluteFill, zIndex: 100, overflow: 'hidden', alignItems: 'center', backgroundColor: '#0A254A' },
   openingSequenceGroup: { position: 'absolute', top: '50%', left: 0, right: 0, marginTop: -87, height: 134, alignItems: 'center', justifyContent: 'center' },
   openingRoute: { width: 260, height: 70, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   openingSequenceVehicle: { position: 'absolute' },
@@ -1872,7 +1872,7 @@ const styles = StyleSheet.create({
   searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
   blinkTabs: { gap: 3, paddingTop: 12, paddingHorizontal: 10, alignItems: 'flex-start', backgroundColor: 'transparent' },
   blinkTab: { width: 78, height: 72, borderBottomWidth: 2, borderBottomColor: '#000000', borderRadius: 10, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 7, backgroundColor: 'transparent' },
-  blinkTabGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 9 },
+  blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 9 },
   blinkTabPartition: { borderRightWidth: 2, borderRightColor: '#000000' },
   blinkTabActive: { backgroundColor: palette.blue },
   blinkTabIndicator: { position: 'absolute', left: 10, right: 10, bottom: 0, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.white },
@@ -1880,7 +1880,7 @@ const styles = StyleSheet.create({
   blinkTabTextActive: { color: palette.white, fontWeight: '800' },
   promoCards: { gap: 12, paddingVertical: 8 },
   promoCard: { height: 270, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 21, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 7, elevation: 4 },
-  promoImageFrame: { ...StyleSheet.absoluteFillObject, borderRadius: 19, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  promoImageFrame: { ...StyleSheet.absoluteFill, borderRadius: 19, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   promoImage: { width: '100%', height: '100%', transform: [{ scale: 1.28 }] },
   promoCopy: { position: 'absolute', left: 13, right: 10, bottom: 15 },
   promoTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 17, lineHeight: 20, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.58)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
@@ -2054,7 +2054,7 @@ const styles = StyleSheet.create({
   offersGrid: { paddingHorizontal: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   offerCard: { width: '48.3%', aspectRatio: 0.8, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E8ECF2', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 6, elevation: 4 },
   offerCardImage: { width: '100%', height: '100%' },
-  offerCardShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
+  offerCardShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.16)' },
   offerCardCopy: { position: 'absolute', left: 11, right: 9, bottom: 12 },
   offerCardTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   offerCardAction: { marginTop: 5, color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
@@ -2099,7 +2099,7 @@ const styles = StyleSheet.create({
   collectionBrandText: { fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '500', color: '#111' },
   jbl: { color: '#E52C22', fontWeight: '900' },
   floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 70, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderTopWidth: 1, borderColor: '#D5DBE3' },
-  cartPopupLayer: { ...StyleSheet.absoluteFillObject, zIndex: 50, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 82 },
+  cartPopupLayer: { ...StyleSheet.absoluteFill, zIndex: 50, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 82 },
   collectionCartPopupLayer: {},
   cartPopup: { width: 174, height: 58, paddingHorizontal: 8, borderRadius: 13, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.blue, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 7 },
   cartPopupImage: { width: 38, height: 38, borderRadius: 5, backgroundColor: '#FFFFFF' },
