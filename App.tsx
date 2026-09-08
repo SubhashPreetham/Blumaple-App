@@ -1588,14 +1588,15 @@ function Storefront() {
           <Animated.View style={[styles.homeProductSections, { opacity: homeCategoryEntrance, transform: [{ translateY: homeCategoryTranslateY }] }]}>
           <HomeSectionHeader title="Shop by Category" />
           <View style={styles.shopCategoryGrid}>
-            {shopCategories.map(({ id, label, image, collection, group }) => <Pressable key={id} style={styles.shopCategoryItem} onPress={() => {
+            {shopCategories.map(({ id, label, image, collection, group }, index) => <Pressable key={id} style={[styles.shopCategoryItem, index % 2 === 1 && styles.shopCategoryItemMirrored]} onPress={() => {
               if (collection && group) {
                 openCategoryCollection(group, collection, 'home');
               }
             }}>
+              <View pointerEvents="none" style={[styles.shopCategoryBorderCap, index % 3 === 1 && styles.shopCategoryBorderCapBlue, index % 3 === 2 && styles.shopCategoryBorderCapRed]} />
+              <View pointerEvents="none" style={styles.shopCategoryAccent}><View style={styles.shopCategoryAccentInner} /></View>
               <View style={styles.shopCategoryImageBlock}><View style={styles.shopCategoryImageClip}><CollectionArtwork source={image} /></View></View>
-              <Text numberOfLines={2} style={styles.shopCategoryLabel}>{label}</Text>
-              <Ionicons name="chevron-forward" size={15} color={palette.blue} />
+              <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.76} style={styles.shopCategoryLabel}>{label}</Text>
             </Pressable>)}
           </View>
           </Animated.View>
@@ -1921,14 +1922,20 @@ const styles = StyleSheet.create({
   homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '900' },
   homeSectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   homeSectionActionText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
-  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  shopCategoryItem: { width: '48.6%', minHeight: 68, paddingHorizontal: 9, paddingVertical: 8, borderWidth: 1, borderColor: '#EDF0F4', borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FAFBFC', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 5, elevation: 2 },
-  shopCategoryImageBlock: { width: 50, height: 50, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  shopCategoryImageClip: { width: '100%', height: '100%', borderRadius: 13, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  shopCategoryImage: { width: '100%', height: '100%', borderRadius: 11, transform: [{ scale: 1.12 }] },
+  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13 },
+  shopCategoryItem: { position: 'relative', width: '31.4%', height: 138, paddingHorizontal: 7, paddingTop: 12, paddingBottom: 9, overflow: 'hidden', borderWidth: 1, borderColor: '#E8EDF4', borderTopLeftRadius: 28, borderTopRightRadius: 14, borderBottomLeftRadius: 14, borderBottomRightRadius: 28, alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 8, elevation: 3 },
+  shopCategoryItemMirrored: { borderTopLeftRadius: 14, borderTopRightRadius: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 14 },
+  shopCategoryBorderCap: { position: 'absolute', left: 15, right: 15, top: 0, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: '#0A254A' },
+  shopCategoryBorderCapBlue: { backgroundColor: palette.blue },
+  shopCategoryBorderCapRed: { backgroundColor: palette.red },
+  shopCategoryAccent: { position: 'absolute', top: -18, right: -18, width: 57, height: 57, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5FC' },
+  shopCategoryAccentInner: { width: 25, height: 25, borderWidth: 5, borderColor: '#FFFFFF', borderRadius: 13 },
+  shopCategoryImageBlock: { width: 88, height: 78, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFD' },
+  shopCategoryImageClip: { width: '100%', height: '100%', borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFD' },
+  shopCategoryImage: { width: '100%', height: '100%', borderRadius: 11, transform: [{ scale: 1.42 }] },
   collectionArtwork: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   collectionArtworkHidden: { position: 'absolute', opacity: 0.01 },
-  shopCategoryLabel: { flex: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, fontWeight: '800' },
+  shopCategoryLabel: { width: '100%', minHeight: 31, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '900', textAlign: 'center', textAlignVertical: 'center' },
   exploreCard: { width: 130, height: 180, borderRadius: 12, overflow: 'hidden', backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border },
   trendingCard: { flex: 1, width: undefined },
   exploreImage: { width: '84%', alignSelf: 'center', height: 112, marginTop: 10, backgroundColor: palette.white },
@@ -1955,8 +1962,8 @@ const styles = StyleSheet.create({
   sectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   productCard: { marginBottom: 15 },
   collectionProductCard: { marginBottom: 0 },
-  collectionProductVisual: { width: '100%', aspectRatio: 0.92, borderWidth: 1, borderColor: '#E7E7E7', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  collectionProductImage: { position: 'absolute', width: '94%', height: '94%' },
+  collectionProductVisual: { width: '100%', aspectRatio: 0.78, borderWidth: 1, borderColor: '#E7E7E7', borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  collectionProductImage: { position: 'absolute', width: '98%', height: '98%' },
   collectionUnavailable: { opacity: 0.45 },
   collectionDiscountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
   collectionDiscountText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
