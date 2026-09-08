@@ -55,6 +55,7 @@ const palette = {
 };
 
 const SEARCH_PLACEHOLDERS = ['Watches', 'Cameras', 'Headphones', 'Radios', 'Mobile Cases', 'Tumblers', 'Computer Peripharels', 'System Components'];
+const CAROUSEL_INTERVAL_MS = 3000;
 
 const BOTTOM_NAV_HEIGHT = 70;
 const FLOATING_CART_GAP = 12;
@@ -278,6 +279,14 @@ function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFav
 
 function SectionTitle({ children }: React.PropsWithChildren) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
+}
+
+function HomeSectionHeader({ title, action = 'View all' }: { title: string; action?: string }) {
+  return <View style={styles.homeSectionHeader}><Text style={styles.homeSectionTitle}>{title}</Text><View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View></View>;
+}
+
+function CarouselProgressIndicators({ count, activeIndex, fill }: { count: number; activeIndex: number; fill: Animated.Value }) {
+  return <View style={styles.carouselProgressRow}>{Array.from({ length: count }).map((_, index) => index === activeIndex ? <View key={index} style={styles.carouselProgressTrack}><Animated.View style={[styles.carouselProgressFill, { width: fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} /></View> : <View key={index} style={styles.carouselProgressDot} />)}</View>;
 }
 
 function RotatingSearchIcon({ size = 24 }: { size?: number }) {
@@ -556,10 +565,11 @@ function Storefront() {
   const contentWidth = Math.min(screenWidth, 440);
   const cardWidth = Math.max(156, (contentWidth - 46) / 2);
   const wishlistCardWidth = (contentWidth - 36) / 2;
-  const trendingCardWidth = Math.max(138, (contentWidth - 96) / 2);
-  const carouselCardWidth = Math.round((contentWidth - 20) / 2);
+  const trendingCardWidth = Math.max(150, (contentWidth - 44) / 2);
+  const carouselCardWidth = Math.round(contentWidth - 32);
   const carouselStep = carouselCardWidth + 12;
   const [activeBanner, setActiveBanner] = useState(0);
+  const [carouselCycle, setCarouselCycle] = useState(0);
   const [activeCategory, setActiveCategory] = useState('Audio');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteProducts, setFavoriteProducts] = useState<Record<string, Product>>({});
@@ -622,6 +632,7 @@ function Storefront() {
   const [activeFooterTab, setActiveFooterTab] = useState<'home' | 'categories' | 'orders' | 'wishlist' | 'offers'>('home');
   const carouselRef = useRef<ScrollView>(null);
   const carouselPositionRef = useRef(0);
+  const carouselProgress = useRef(new Animated.Value(0)).current;
   const orderDetailsScrollRef = useRef<ScrollView>(null);
   const productRecommendationRequestRef = useRef(0);
 
@@ -1085,6 +1096,8 @@ function Storefront() {
 
   useEffect(() => {
     const homeIsVisible = screen === 'home' && !footerPageTransitioning && !openingAnimationVisible && !customerAuth.loading && (customerAuth.isLoggedIn || initialLoginSkipped) && !checkoutLoginRequired;
+    carouselProgress.stopAnimation();
+    carouselProgress.setValue(0);
     if (!homeIsVisible || carouselSlideCount < 2) return;
     const advanceCarousel = () => {
       let nextPosition = carouselPositionRef.current + 1;
@@ -1096,9 +1109,10 @@ function Storefront() {
       carouselPositionRef.current = nextPosition;
       carouselRef.current?.scrollTo({ x: carouselStep * nextPosition, animated: true });
     };
-    const interval = setInterval(advanceCarousel, 3000);
-    return () => clearInterval(interval);
-  }, [carouselSlideCount, carouselStep, checkoutLoginRequired, customerAuth.isLoggedIn, customerAuth.loading, footerPageTransitioning, initialLoginSkipped, openingAnimationVisible, screen]);
+    const progressAnimation = Animated.timing(carouselProgress, { toValue: 1, duration: CAROUSEL_INTERVAL_MS, easing: Easing.linear, useNativeDriver: false });
+    progressAnimation.start(({ finished }) => { if (finished) advanceCarousel(); });
+    return () => progressAnimation.stop();
+  }, [activeBanner, carouselCycle, carouselProgress, carouselSlideCount, carouselStep, checkoutLoginRequired, customerAuth.isLoggedIn, customerAuth.loading, footerPageTransitioning, initialLoginSkipped, openingAnimationVisible, screen]);
 
   useEffect(() => {
     fetchShopifyProducts()
@@ -1457,6 +1471,10 @@ function Storefront() {
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.white} /><Text style={[styles.addAddressText, styles.homeHeaderText]}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
           <View style={styles.deliveryActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}>
+              <Ionicons name="bag-handle-outline" size={25} color={palette.white} />
+              {cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}
+            </Pressable>
             <View>
               <Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.white} /></Pressable>
             </View>
@@ -1468,7 +1486,7 @@ function Storefront() {
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
+          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.ink} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable><Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
         </View>}
 
         {screen === 'home' && <Animated.View style={[styles.staticSearchZone, styles.homeHeroSurface, { opacity: homeSearchEntrance, transform: [{ translateY: homeSearchTranslateY }] }]}>
@@ -1515,7 +1533,7 @@ function Storefront() {
             {displayHomeMenus.map((menu, index) => (
               <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, activeCategory === menu.label && styles.blinkTabActive]}>
                 {activeCategory !== menu.label && <LinearGradient pointerEvents="none" colors={['#FFFFFF', '#EEF2F7']} style={styles.blinkTabGradient} />}
-                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={29} color={activeCategory === menu.label ? palette.white : palette.ink} />
+                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={19} color={activeCategory === menu.label ? palette.white : palette.ink} />
                 <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
                 {activeCategory === menu.label && <View style={styles.blinkTabIndicator} />}
               </Pressable>
@@ -1530,9 +1548,14 @@ function Storefront() {
             snapToInterval={carouselStep}
             decelerationRate="normal"
             overScrollMode="never"
+            onScrollBeginDrag={() => {
+              carouselProgress.stopAnimation();
+              carouselProgress.setValue(0);
+            }}
             onMomentumScrollEnd={event => {
               const index = Math.round(event.nativeEvent.contentOffset.x / carouselStep);
               setActiveBanner(index % carouselSlideCount);
+              setCarouselCycle(current => current + 1);
               carouselPositionRef.current = index;
               if (index >= carouselSlideCount * 2) requestAnimationFrame(() => {
                 carouselPositionRef.current = index - carouselSlideCount;
@@ -1543,7 +1566,7 @@ function Storefront() {
                 carouselRef.current?.scrollTo({ x: carouselPositionRef.current * carouselStep, animated: false });
               });
             }}
-            contentContainerStyle={[styles.promoCards, { paddingHorizontal: carouselCardWidth / 2 }]}
+            contentContainerStyle={[styles.promoCards, { paddingHorizontal: (contentWidth - carouselCardWidth) / 2 }]}
           >
             {[...carouselSlides, ...carouselSlides, ...carouselSlides].map((slide, index) => <Pressable key={`${activeHomeMenu.label}-${slide.id}-${index}`} style={[styles.promoCard, { width: carouselCardWidth }]} onPress={() => {
               if (slide.category) {
@@ -1557,13 +1580,13 @@ function Storefront() {
               <View style={styles.promoCopy}><Text numberOfLines={2} style={styles.promoTitle}>{slide.title}</Text>{slide.subtitle ? <Text style={styles.promoSubtitle}>{slide.subtitle}</Text> : null}</View>
             </Pressable>)}
           </ScrollView>
-          <View style={styles.dots}>{Array.from({ length: carouselSlideCount }).map((_, index) => <View key={index} style={[styles.dot, index === activeBanner && styles.dotActive]} />)}</View></> : <View style={styles.carouselLoading}><CartonBoxLoader /></View>}
+          <CarouselProgressIndicators count={carouselSlideCount} activeIndex={activeBanner} fill={carouselProgress} /></> : <View style={styles.carouselLoading}><CartonBoxLoader /></View>}
           </View>
           </View>
           <View style={[styles.zigzagPartition, styles.homeHeroSurface]}>{Array.from({ length: 30 }).map((_, index) => <View key={index} style={styles.zigzagTooth} />)}</View>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeCategoryEntrance, transform: [{ translateY: homeCategoryTranslateY }] }]}>
-          <SectionTitle>Shop by Category</SectionTitle>
+          <HomeSectionHeader title="Shop by Category" />
           <View style={styles.shopCategoryGrid}>
             {shopCategories.map(({ id, label, image, collection, group }) => <Pressable key={id} style={styles.shopCategoryItem} onPress={() => {
               if (collection && group) {
@@ -1572,17 +1595,18 @@ function Storefront() {
             }}>
               <View style={styles.shopCategoryImageBlock}><View style={styles.shopCategoryImageClip}><CollectionArtwork source={image} /></View></View>
               <Text numberOfLines={2} style={styles.shopCategoryLabel}>{label}</Text>
+              <Ionicons name="chevron-forward" size={15} color={palette.blue} />
             </Pressable>)}
           </View>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeTrendingEntrance, transform: [{ translateY: homeTrendingTranslateY }] }]}>
-          <SectionTitle>Trending</SectionTitle>
+          <HomeSectionHeader title="Trending" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
             {categoryProducts.map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </ScrollView>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeBestSellingEntrance, transform: [{ translateY: homeBestSellingTranslateY }] }]}>
-          <SectionTitle>Best Selling</SectionTitle>
+          <HomeSectionHeader title="Best Selling" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
             {categoryProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </ScrollView>
@@ -1767,8 +1791,8 @@ const styles = StyleSheet.create({
   profileHeaderTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   profileHeaderSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   profileHeaderAccount: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
-  deliveryHeader: { minHeight: 82, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A' },
-  transportLane: { height: 44, overflow: 'hidden', position: 'relative', backgroundColor: homeChrome },
+  deliveryHeader: { minHeight: 92, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 10, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A' },
+  transportLane: { height: 34, overflow: 'hidden', position: 'relative', backgroundColor: homeChrome },
   orbitLine: { position: 'absolute', left: 0, right: 0, top: 16, height: 4, borderRadius: 2, backgroundColor: '#C9D2DF' },
   redTrack: { backgroundColor: palette.red },
   blueTrack: { backgroundColor: palette.blue },
@@ -1778,9 +1802,9 @@ const styles = StyleSheet.create({
   transportFlight: { position: 'absolute', left: 0, top: -1 },
   transportTruck: { position: 'absolute', left: 0, top: -3 },
   deliveryBrandBlock: { zIndex: 1, flex: 1, marginLeft: 0, position: 'relative' },
-  deliveryLogo: { width: 245, height: 63, marginTop: -15, marginLeft: -39, alignSelf: 'flex-start' },
-  addAddressButton: { position: 'absolute', left: -39, bottom: -17, width: 245, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  addAddressText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '500', fontStyle: 'italic', textDecorationLine: 'underline' },
+  deliveryLogo: { width: 184, height: 48, marginTop: -8, marginLeft: -20, alignSelf: 'flex-start' },
+  addAddressButton: { position: 'absolute', left: -2, bottom: -20, minWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  addAddressText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '600', fontStyle: 'italic', textDecorationLine: 'underline' },
   homeHeaderText: { color: palette.white },
   deliveryBrand: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '800' },
   deliveryTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
@@ -1788,6 +1812,9 @@ const styles = StyleSheet.create({
   deliveryDistance: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, overflow: 'hidden', backgroundColor: '#DCE7FF', color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
   deliveryAddress: { marginTop: 2, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '600' },
   deliveryActions: { zIndex: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  headerCartButton: { position: 'relative', width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
+  headerCartBadge: { position: 'absolute', top: 2, right: 1, minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.red, borderWidth: 1.5, borderColor: '#0A254A' },
+  headerCartBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 8, fontWeight: '900' },
   wallet: { width: 47, height: 47, borderRadius: 24, backgroundColor: palette.white, justifyContent: 'center', alignItems: 'center' },
   walletText: { marginTop: -2, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '800' },
   modalBackdrop: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.42)' },
@@ -1807,18 +1834,18 @@ const styles = StyleSheet.create({
   badgeText: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '700' },
   content: { paddingHorizontal: 0, paddingBottom: 72 },
   browseContent: { paddingBottom: 10 },
-  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: homeChrome },
-  carouselFade: { minHeight: 307, marginTop: 18, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
-  carouselLoading: { height: 307, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A254A' },
+  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, paddingBottom: 8, backgroundColor: homeChrome },
+  carouselFade: { minHeight: 229, marginTop: 12, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
+  carouselLoading: { height: 218, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12345B' },
   carouselLoadingText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
   cartonLoader: { width: 66, height: 58, alignItems: 'center', justifyContent: 'flex-end' },
   openingCarton: { width: 46, height: 46 },
   openingCartonIcon: { position: 'absolute', left: 0, top: 0 },
-  zigzagPartition: { height: 14, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', backgroundColor: homeChrome },
+  zigzagPartition: { height: 24, marginTop: -8, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: palette.white },
   bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: '#F5F5F5' },
-  zigzagTooth: { width: 16, height: 16, marginHorizontal: 1, marginTop: 6, backgroundColor: palette.white, transform: [{ rotate: '45deg' }] },
-  staticSearchZone: { paddingTop: 0, paddingBottom: 8, overflow: 'visible', backgroundColor: homeChrome, zIndex: 100, elevation: 20 },
-  searchBox: { height: 50, marginHorizontal: 16, borderWidth: 1, borderColor: '#AEB7C3', borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: palette.white },
+  zigzagTooth: { display: 'none' },
+  staticSearchZone: { paddingTop: 2, paddingBottom: 10, overflow: 'visible', backgroundColor: homeChrome, zIndex: 100, elevation: 20 },
+  searchBox: { height: 52, marginHorizontal: 16, borderWidth: 0, borderRadius: 15, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: palette.white, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 5 },
   searchInputWrap: { flex: 1, height: '100%', justifyContent: 'center', overflow: 'hidden' },
   searchAnimatedPlaceholder: { position: 'absolute', left: 0, color: '#9B9B9B', fontFamily: 'Inter_400Regular', fontSize: 12 },
   searchInput: { flex: 1, padding: 0, fontFamily: 'Inter_400Regular', fontSize: 12, color: palette.ink },
@@ -1870,34 +1897,38 @@ const styles = StyleSheet.create({
   searchLoadMore: { width: 150, height: 44, marginTop: 20, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: palette.blue },
   searchLoadMoreDisabled: { opacity: 0.6 },
   searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  blinkTabs: { gap: 3, paddingTop: 12, paddingHorizontal: 10, alignItems: 'flex-start', backgroundColor: 'transparent' },
-  blinkTab: { width: 78, height: 72, borderBottomWidth: 2, borderBottomColor: '#000000', borderRadius: 10, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 7, backgroundColor: 'transparent' },
-  blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 9 },
-  blinkTabPartition: { borderRightWidth: 2, borderRightColor: '#000000' },
-  blinkTabActive: { backgroundColor: palette.blue },
-  blinkTabIndicator: { position: 'absolute', left: 10, right: 10, bottom: 0, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.white },
-  blinkTabText: { marginTop: 6, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '500', textAlign: 'center' },
+  blinkTabs: { gap: 8, paddingTop: 10, paddingHorizontal: 16, alignItems: 'center', backgroundColor: 'transparent' },
+  blinkTab: { minWidth: 96, height: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 14, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
+  blinkTabPartition: { borderRightWidth: 0 },
+  blinkTabActive: { borderColor: palette.blue, backgroundColor: palette.blue },
+  blinkTabIndicator: { position: 'absolute', left: 22, right: 22, bottom: 3, height: 2, borderRadius: 2, backgroundColor: palette.white },
+  blinkTabText: { color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
   blinkTabTextActive: { color: palette.white, fontWeight: '800' },
-  promoCards: { gap: 12, paddingVertical: 8 },
-  promoCard: { height: 270, borderWidth: 1, borderColor: '#FFFFFF', borderRadius: 21, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.16, shadowRadius: 7, elevation: 4 },
+  promoCards: { gap: 12, paddingVertical: 5 },
+  promoCard: { height: 196, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 5 },
   promoImageFrame: { ...StyleSheet.absoluteFill, borderRadius: 19, overflow: 'hidden', backgroundColor: '#FFFFFF' },
-  promoImage: { width: '100%', height: '100%', transform: [{ scale: 1.28 }] },
-  promoCopy: { position: 'absolute', left: 13, right: 10, bottom: 15 },
-  promoTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 17, lineHeight: 20, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.58)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
+  promoImage: { width: '100%', height: '100%', transform: [{ scale: 1.08 }] },
+  promoCopy: { position: 'absolute', left: 18, right: 14, bottom: 17 },
+  promoTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 19, lineHeight: 23, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   promoSubtitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, marginTop: 4, width: 140, textShadowColor: 'rgba(0,0,0,0.58)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   blinkDivider: { marginTop: 15, marginHorizontal: 0, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EEF3FF' },
   blinkDividerText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
-  trendingProductRow: { gap: 12, paddingHorizontal: 2, paddingBottom: 5 },
-  homeProductSections: { paddingHorizontal: 12, backgroundColor: palette.white },
-  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5, rowGap: 14 },
-  shopCategoryItem: { width: '25%', paddingHorizontal: 5, alignItems: 'center' },
-  shopCategoryImageBlock: { width: '100%', aspectRatio: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 5, elevation: 3 },
-  shopCategoryImageClip: { width: '100%', height: '100%', borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  shopCategoryImage: { width: '100%', height: '100%', borderRadius: 12, transform: [{ scale: 1.24 }] },
+  trendingProductRow: { gap: 12, paddingHorizontal: 2, paddingBottom: 10 },
+  homeProductSections: { paddingHorizontal: 16, backgroundColor: palette.white },
+  homeSectionHeader: { minHeight: 54, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '900' },
+  homeSectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  homeSectionActionText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
+  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  shopCategoryItem: { width: '48.6%', minHeight: 68, paddingHorizontal: 9, paddingVertical: 8, borderWidth: 1, borderColor: '#EDF0F4', borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FAFBFC', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 5, elevation: 2 },
+  shopCategoryImageBlock: { width: 50, height: 50, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  shopCategoryImageClip: { width: '100%', height: '100%', borderRadius: 13, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  shopCategoryImage: { width: '100%', height: '100%', borderRadius: 11, transform: [{ scale: 1.12 }] },
   collectionArtwork: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   collectionArtworkHidden: { position: 'absolute', opacity: 0.01 },
-  shopCategoryLabel: { minHeight: 30, marginTop: 7, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
+  shopCategoryLabel: { flex: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, fontWeight: '800' },
   exploreCard: { width: 130, height: 180, borderRadius: 12, overflow: 'hidden', backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border },
   trendingCard: { flex: 1, width: undefined },
   exploreImage: { width: '84%', alignSelf: 'center', height: 112, marginTop: 10, backgroundColor: palette.white },
@@ -1917,6 +1948,10 @@ const styles = StyleSheet.create({
   dots: { height: 21, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
   dotActive: { width: 4, backgroundColor: palette.blue },
+  carouselProgressRow: { height: 22, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  carouselProgressTrack: { width: 18, height: 4, overflow: 'hidden', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.36)' },
+  carouselProgressFill: { height: '100%', borderRadius: 2, backgroundColor: palette.blue },
+  carouselProgressDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.72)' },
   sectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   productCard: { marginBottom: 15 },
   collectionProductCard: { marginBottom: 0 },
