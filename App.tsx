@@ -249,11 +249,11 @@ function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFav
       <Pressable onPress={onOpen} style={styles.collectionProductVisual}>
         {imageFailed ? <Ionicons name="image-outline" size={34} color="#A7B0BC" /> : <Image source={item.image} style={[styles.collectionProductImage, !availableForSale && styles.collectionUnavailable]} resizeMode="contain" onError={() => setImageFailed(true)} />}
         {!availableForSale ? <View style={styles.collectionComingSoon}><Text style={styles.collectionComingSoonText}>Coming soon</Text></View> : discountLabel ? <View style={styles.collectionDiscountBadge}><Text style={styles.collectionDiscountText}>{discountLabel}</Text></View> : null}
-        {showFavorite ? <Pressable hitSlop={10} onPress={onFavorite} style={styles.collectionHeart}><Ionicons name={favorite ? 'heart' : 'heart-outline'} size={21} color={favorite ? WISHLIST_ACTIVE_COLOR : palette.blue} /></Pressable> : null}
-        <Pressable onPress={availableForSale ? onAdd : notifyConfirmation.notify} style={[styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction]}>{availableForSale ? <Text style={styles.collectionImageActionText}>ADD</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} />}</Pressable>
+        {showFavorite ? <Pressable hitSlop={10} onPress={onFavorite} style={styles.collectionHeart}><Ionicons name={favorite ? 'heart' : 'heart-outline'} size={22} color={favorite ? WISHLIST_ACTIVE_COLOR : palette.ink} /></Pressable> : null}
       </Pressable>
       <Text numberOfLines={2} style={[styles.collectionProductName, !availableForSale && styles.collectionUnavailable]}>{item.name}</Text>
       <View style={[styles.collectionPriceRow, !availableForSale && styles.collectionUnavailable]}><Text style={[styles.collectionPrice, item.oldPrice && styles.collectionSalePrice]}>{item.price}</Text>{item.oldPrice ? <Text numberOfLines={1} style={styles.collectionOldPrice}>{item.oldPrice}</Text> : null}</View>
+      <Pressable onPress={availableForSale ? onAdd : notifyConfirmation.notify} style={({ pressed }) => [styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction, pressed && styles.pressed]}>{availableForSale ? <Text style={styles.collectionImageActionText}>ADD TO CART</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#2E8B36" />}</Pressable>
     </View>;
   }
   return (
@@ -281,8 +281,8 @@ function SectionTitle({ children }: React.PropsWithChildren) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
-function HomeSectionHeader({ title, action = 'View all' }: { title: string; action?: string }) {
-  return <View style={styles.homeSectionHeader}><Text style={styles.homeSectionTitle}>{title}</Text><View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View></View>;
+function HomeSectionHeader({ title, action = 'View all', showAction = true }: { title: string; action?: string; showAction?: boolean }) {
+  return <View style={styles.homeSectionHeader}><Text style={styles.homeSectionTitle}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
 }
 
 function CarouselProgressIndicators({ count, activeIndex, fill }: { count: number; activeIndex: number; fill: Animated.Value }) {
@@ -1586,7 +1586,7 @@ function Storefront() {
           <View style={[styles.zigzagPartition, styles.homeHeroSurface]}>{Array.from({ length: 30 }).map((_, index) => <View key={index} style={styles.zigzagTooth} />)}</View>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeCategoryEntrance, transform: [{ translateY: homeCategoryTranslateY }] }]}>
-          <HomeSectionHeader title="Shop by Category" />
+          <HomeSectionHeader title="Shop by Category" showAction={false} />
           <View style={styles.shopCategoryGrid}>
             {shopCategories.map(({ id, label, image, collection, group }, index) => <Pressable key={id} style={[styles.shopCategoryItem, index % 2 === 1 && styles.shopCategoryItemMirrored]} onPress={() => {
               if (collection && group) {
@@ -1601,16 +1601,16 @@ function Storefront() {
           </View>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeTrendingEntrance, transform: [{ translateY: homeTrendingTranslateY }] }]}>
-          <HomeSectionHeader title="Trending" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
+          <HomeSectionHeader title="Trending" showAction={false} />
+          <View style={styles.homeProductGrid}>
             {categoryProducts.map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
-          </ScrollView>
+          </View>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeBestSellingEntrance, transform: [{ translateY: homeBestSellingTranslateY }] }]}>
-          <HomeSectionHeader title="Best Selling" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
+          <HomeSectionHeader title="Best Selling" showAction={false} />
+          <View style={styles.homeProductGrid}>
             {categoryProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
-          </ScrollView>
+          </View>
           </Animated.View>
 
           </> : screen === 'orders' ? <View style={styles.ordersPage}>
@@ -1916,10 +1916,10 @@ const styles = StyleSheet.create({
   blinkDivider: { marginTop: 15, marginHorizontal: 0, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EEF3FF' },
   blinkDividerText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
-  trendingProductRow: { gap: 12, paddingHorizontal: 2, paddingBottom: 10 },
-  homeProductSections: { paddingHorizontal: 16, backgroundColor: palette.white },
-  homeSectionHeader: { minHeight: 54, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '900' },
+  homeProductGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18, paddingBottom: 12 },
+  homeProductSections: { paddingHorizontal: 16, paddingBottom: 8, backgroundColor: palette.white },
+  homeSectionHeader: { minHeight: 62, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.25 },
   homeSectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   homeSectionActionText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13 },
@@ -1961,25 +1961,25 @@ const styles = StyleSheet.create({
   carouselProgressDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.72)' },
   sectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   productCard: { marginBottom: 15 },
-  collectionProductCard: { marginBottom: 0 },
-  collectionProductVisual: { width: '100%', aspectRatio: 0.78, borderWidth: 1, borderColor: '#E7E7E7', borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  collectionProductCard: { marginBottom: 4, backgroundColor: '#FFFFFF' },
+  collectionProductVisual: { width: '100%', aspectRatio: 0.78, overflow: 'hidden', borderWidth: 1, borderColor: '#ECEDEF', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F8F8' },
   collectionProductImage: { position: 'absolute', width: '98%', height: '98%' },
   collectionUnavailable: { opacity: 0.45 },
   collectionDiscountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
   collectionDiscountText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   collectionComingSoon: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   collectionComingSoonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
-  collectionHeart: { position: 'absolute', top: 7, right: 7 },
-  collectionImageAction: { position: 'absolute', right: 0, bottom: -19, minWidth: 62, height: 38, paddingHorizontal: 10, borderWidth: 1.5, borderColor: palette.blue, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
-  collectionImageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  collectionHeart: { position: 'absolute', right: 8, bottom: 8, width: 38, height: 38, borderWidth: 1, borderColor: '#E2E4E7', borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 },
+  collectionImageAction: { width: '100%', height: 46, marginTop: 10, borderWidth: 1, borderColor: palette.blue, borderRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  collectionImageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 0.3, fontWeight: '900' },
   collectionNotifyAction: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
   collectionNotifyText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
   notifyToast: { position: 'absolute', right: 0, bottom: '100%', minWidth: 122, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, alignItems: 'center', backgroundColor: '#1A1C1D', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 5 },
   notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
-  collectionProductName: { minHeight: 34, marginTop: 25, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 15, fontWeight: '700' },
-  collectionPriceRow: { height: 46, marginTop: 3, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start', alignItems: 'baseline', columnGap: 4, rowGap: 2, overflow: 'hidden' },
+  collectionProductName: { minHeight: 40, marginTop: 10, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  collectionPriceRow: { minHeight: 24, marginTop: 4, flexDirection: 'row', alignItems: 'baseline', columnGap: 6, overflow: 'hidden' },
   collectionPrice: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
   collectionSalePrice: { color: '#D83434' },
   collectionOldPrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
