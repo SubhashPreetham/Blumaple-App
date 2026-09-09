@@ -12,6 +12,7 @@
     ],
     "ios": {
       "icon": "./icon/app_icon.png",
+      "bundleIdentifier": "com.blumaple.app",
       "supportsTablet": true
     },
     "android": {
@@ -28,8 +29,6 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      "expo-sharing",
-      "expo-status-bar",
       "expo-web-browser"
     ],
     "extra": {

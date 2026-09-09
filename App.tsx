@@ -12,7 +12,6 @@ import {
   LayoutAnimation,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -20,7 +19,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   View,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,6 +26,7 @@ import { Inter_400Regular, useFonts } from '@expo-google-fonts/inter';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, searchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
 import { CheckoutPage } from './pages/CheckoutPage';
@@ -56,6 +55,7 @@ const palette = {
 
 const SEARCH_PLACEHOLDERS = ['Watches', 'Cameras', 'Headphones', 'Radios', 'Mobile Cases', 'Tumblers', 'Computer Peripharels', 'System Components'];
 const CAROUSEL_INTERVAL_MS = 3000;
+const CHECKOUT_ADDRESS_KEY = 'blumaple.checkout.address.v1';
 
 const BOTTOM_NAV_HEIGHT = 70;
 const FLOATING_CART_GAP = 12;
@@ -64,10 +64,6 @@ const FLOATING_CONTROL_GAP = 12;
 const WISHLIST_ACTIVE_COLOR = '#B85C5C';
 const homeChrome = '#D3DDEA';
 const footerDiscountTag = require('./assets/ui/offers.png');
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 type Product = {
   id: string;
@@ -444,7 +440,6 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
         <View style={styles.detailStockRow}><View style={[styles.stockDot, !availableForSale && styles.stockDotUnavailable]} /><Text style={[styles.stockText, !availableForSale && styles.stockTextUnavailable]}>{availableForSale ? 'In stock' : 'Coming soon'}</Text></View>
         <View style={styles.quantityRow}><Text style={styles.quantityLabel}>Quantity</Text><View style={styles.quantityControl}><Pressable onPress={() => setQuantity(value => Math.max(1, value - 1))}><Text style={styles.quantityButton}>−</Text></Pressable><Text style={styles.quantityValue}>{quantity}</Text><Pressable onPress={() => setQuantity(value => value + 1)}><Text style={styles.quantityButton}>+</Text></Pressable></View></View>
         <Text style={styles.deliveryEstimate}>Estimated Delivery: <Text style={styles.deliveryEstimateValue}>{deliveryRange}</Text></Text>
-        {availableForSale ? <Pressable onPress={onCheckout} style={styles.buyNowButton}><Text style={styles.buyNowButtonText}>BUY IT NOW</Text></Pressable> : null}
         {vendorName.toLowerCase() === 'india warehouse' ? <View style={styles.codBox}><Text style={styles.codText}>Cash on Delivery accepted</Text></View> : null}
         <View style={styles.paymentTrustBox}>
           <View style={styles.paymentLogoSlot}><Image source={require('./assets/payment/visa.png')} style={styles.paymentLogoImage} resizeMode="contain" /></View>
@@ -467,7 +462,7 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
       <Text style={styles.similarSubtitle}>Combine your style with these products</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.detailRecommendations}>{recommendations.filter(item => item.id !== product.id).slice(0, 12).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={150} favorite={favoriteIds.has(item.id)} collectionLayout onFavorite={() => onFavorite(item)} onAdd={() => onAdd(item)} onOpen={() => onOpenProduct(item)} />)}</ScrollView>
     </ScrollView>
-    <View style={styles.buyBar}><View><Text style={styles.buyBarPrice}>{floatingTotal}</Text><Text style={styles.buyBarTax}>Inclusive of all taxes</Text></View><Pressable onPress={availableForSale ? () => onAdd(product) : notifyConfirmation.notify} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}>{availableForSale ? <Text style={styles.addLargeText}>Add to cart</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#FFFFFF" />}</Pressable></View>
+    <View style={styles.buyBar}><Pressable onPress={availableForSale ? () => onAdd(product) : notifyConfirmation.notify} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}>{availableForSale ? <Text style={styles.addLargeText}>Add to cart</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#FFFFFF" />}</Pressable><Pressable disabled={!availableForSale} onPress={onCheckout} style={[styles.footerBuyNow, !availableForSale && styles.footerBuyNowDisabled]}><Text style={styles.footerBuyNowText}>Buy it now</Text></Pressable></View>
     <Modal visible={shareVisible} transparent animationType="slide" onRequestClose={() => setShareVisible(false)}>
       <Pressable style={styles.shareBackdrop} onPress={() => setShareVisible(false)}><Pressable style={styles.shareSheet} onPress={() => {}}>
         <View style={styles.shareSheetHeader}><Text style={styles.shareSheetTitle}>Share product</Text><Pressable onPress={() => setShareVisible(false)}><Ionicons name="close" size={23} color={palette.ink} /></Pressable></View>
@@ -619,6 +614,8 @@ function Storefront() {
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [shopifyError, setShopifyError] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [shippingAddressRestored, setShippingAddressRestored] = useState(false);
+  const checkoutAddressKey = customerAuth.customer?.id ? `${CHECKOUT_ADDRESS_KEY}.${customerAuth.customer.id}` : `${CHECKOUT_ADDRESS_KEY}.guest`;
   const [checkoutInitialStage, setCheckoutInitialStage] = useState<2 | 3>(2);
   const [orderOutcome, setOrderOutcome] = useState<OrderOutcome | null>(null);
   const [pincodeModalVisible, setPincodeModalVisible] = useState(false);
@@ -634,6 +631,32 @@ function Storefront() {
   const carouselPositionRef = useRef(0);
   const carouselProgress = useRef(new Animated.Value(0)).current;
   const orderDetailsScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    setShippingAddressRestored(false);
+    setShippingAddress(null);
+    SecureStore.getItemAsync(checkoutAddressKey).then(value => {
+      if (value) {
+        try { setShippingAddress(JSON.parse(value) as ShippingAddress); } catch { void SecureStore.deleteItemAsync(checkoutAddressKey); }
+      }
+    }).finally(() => setShippingAddressRestored(true));
+  }, [checkoutAddressKey]);
+
+  useEffect(() => {
+    if (!shippingAddressRestored || !shippingAddress) return;
+    void SecureStore.setItemAsync(checkoutAddressKey, JSON.stringify(shippingAddress));
+  }, [checkoutAddressKey, shippingAddress, shippingAddressRestored]);
+
+  useEffect(() => {
+    if (!shippingAddressRestored || shippingAddress || !customerAuth.customer) return;
+    const customer = customerAuth.customer;
+    const address = customer.defaultAddress ?? customer.addresses?.nodes?.[0];
+    if (!address?.address1 || !address.city || !address.zip) return;
+    const firstName = address.firstName || customer.firstName || '';
+    const lastName = address.lastName || customer.lastName || '';
+    const phone = (address.phoneNumber || customer.phoneNumber?.phoneNumber || '').replace(/\D/g, '').slice(-10);
+    setShippingAddress({ firstName, lastName: lastName || undefined, name: `${firstName} ${lastName}`.trim() || customer.displayName, email: customer.emailAddress?.emailAddress || undefined, phone, company: address.company || undefined, address1: address.address1, address2: address.address2 || undefined, line: `${address.address1}${address.address2 ? `, ${address.address2}` : ''}${address.company ? `, ${address.company}` : ''}`, city: address.city, state: address.zoneCode || '', country: 'India', countryCode: address.territoryCode || 'IN', pincode: address.zip, billingSameAsShipping: true });
+  }, [customerAuth.customer, shippingAddress, shippingAddressRestored]);
   const productRecommendationRequestRef = useRef(0);
 
   useEffect(() => {
@@ -931,31 +954,20 @@ function Storefront() {
   [activeHomeMenu.label, activeShopifyMenu, categoryProducts, shopifyCollectionPreviews, uploadedSlides]);
   const carouselSlideCount = Math.max(1, carouselSlides.length);
   const offerCollections = carouselSlides.slice(0, 8);
-  const historyOrders = useMemo<HistoryOrder[]>(() => {
-    const day = 24 * 60 * 60 * 1000;
-    const now = Date.now();
-    const cases: Array<{ status: HistoryOrder['status']; orderedDaysAgo: number; deliveredDaysAgo?: number }> = [
-      { status: 'Delivered', orderedDaysAgo: 9, deliveredDaysAgo: 3 },
-      { status: 'Delivered', orderedDaysAgo: 22, deliveredDaysAgo: 12 },
-      { status: 'Shipped', orderedDaysAgo: 5 },
-      { status: 'Processing', orderedDaysAgo: 2 },
-      { status: 'Cancelled', orderedDaysAgo: 14 },
-      { status: 'Returned', orderedDaysAgo: 30, deliveredDaysAgo: 20 },
-    ];
-    return cases.map(({ status, orderedDaysAgo, deliveredDaysAgo }, index) => {
-      const orderProducts = Array.from({ length: index % 3 + 1 }, (_, productIndex) => catalog[(index * 2 + productIndex) % catalog.length]!).filter(Boolean);
-      const total = orderProducts.reduce((sum, product) => sum + (product.unitPrice ?? (Number(product.price.replace(/[^0-9.]/g, '')) || 0)), 0);
-      return {
-        id: `BM/APP-${4821 + index * 137}`,
-        date: new Date(now - orderedDaysAgo * day).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        products: orderProducts,
-        amount: money(String(total), orderProducts[0]?.currencyCode ?? 'INR'),
-        status,
-        deliveredAt: deliveredDaysAgo === undefined ? undefined : new Date(now - deliveredDaysAgo * day).toISOString(),
-        shippingAddress: index % 2 === 0 ? 'Ananya Sharma, 18 MG Road, Indiranagar, Bengaluru, Karnataka 560038 · +91 98765 43210' : 'Rahul Menon, 42 Lake View Street, Anna Nagar, Chennai, Tamil Nadu 600040 · +91 91234 56789',
-      };
+  const historyOrders = useMemo<HistoryOrder[]>(() => (customerAuth.customer?.orders?.nodes || []).map(order => {
+    const financialStatus = order.financialStatus?.toUpperCase();
+    const fulfillmentStatus = order.fulfillmentStatus?.toUpperCase();
+    const status: HistoryOrder['status'] = financialStatus === 'VOIDED' ? 'Cancelled' : financialStatus === 'REFUNDED' || financialStatus === 'PARTIALLY_REFUNDED' ? 'Returned' : fulfillmentStatus === 'FULFILLED' || fulfillmentStatus === 'IN_PROGRESS' ? 'Shipped' : 'Processing';
+    const products: Product[] = order.lineItems.nodes.map((lineItem, index) => {
+      const variant = lineItem.variant;
+      const product = variant?.product;
+      const price = variant?.price;
+      const imageUrl = variant?.image?.url || product?.featuredImage?.url;
+      return { id: variant?.id || `${order.id}-${index}`, name: product?.title || lineItem.title, price: price ? money(price.amount, price.currencyCode) : '', oldPrice: '', discount: '', image: imageUrl ? { uri: imageUrl } : require('./assets/figma/product-headphones.png'), vendor: product?.vendor || '', brand: product?.vendor || '', sku: variant?.sku || undefined, unitPrice: price ? Number(price.amount) : undefined, currencyCode: price?.currencyCode, handle: product?.handle };
     });
-  }, [catalog]);
+    const addressLines = order.shippingAddress?.formatted || [];
+    return { id: order.name, date: new Date(order.processedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }), products, amount: money(order.totalPrice.amount, order.totalPrice.currencyCode), status, shippingAddress: [...addressLines, order.shippingAddress?.phone].filter(Boolean).join(' · ') };
+  }), [customerAuth.customer?.orders?.nodes]);
 
   useEffect(() => {
     if (!storefrontHeaderVisible) {
@@ -1370,11 +1382,11 @@ function Storefront() {
   );
 
   if (!openingAnimationVisible && !customerAuth.loading && !customerAuth.isLoggedIn && !initialLoginSkipped && !checkoutLoginRequired) {
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><Animated.View style={[styles.loginEntrance, { opacity: loginEntranceOpacity, transform: [{ translateY: loginEntranceTranslateY }] }]}><SkippableLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onSkip={() => setInitialLoginSkipped(true)} /></Animated.View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><Animated.View style={[styles.loginEntrance, { opacity: loginEntranceOpacity, transform: [{ translateY: loginEntranceTranslateY }] }]}><SkippableLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onGoogleLogin={customerAuth.loginWithGoogle} onSkip={() => setInitialLoginSkipped(true)} /></Animated.View></SafeAreaView>;
   }
 
   if (checkoutLoginRequired && !customerAuth.isLoggedIn) {
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><RequiredLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onClose={() => { setCheckoutLoginRequired(false); setScreen('cart'); }} /></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" /><RequiredLoginPage loading={customerAuth.loading} error={customerAuth.error} onLogin={customerAuth.login} onGoogleLogin={customerAuth.loginWithGoogle} onClose={() => { setCheckoutLoginRequired(false); setScreen('cart'); }} /></SafeAreaView>;
   }
 
   if (screen === 'categoryCollection' && selectedCategoryGroup && selectedCollectionItem) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
@@ -1431,7 +1443,7 @@ function Storefront() {
 
   if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => navigateBack('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></Animated.View></SafeAreaView>;
 
-  if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><AddressPage onBack={() => navigateBack('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></Animated.View></SafeAreaView>;
+  if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><AddressPage initialAddress={shippingAddress} onBack={() => navigateBack('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></Animated.View></SafeAreaView>;
 
   if (screen === 'search') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}>
     <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
@@ -1618,7 +1630,7 @@ function Storefront() {
               <Text style={styles.ordersHeading}>Order History</Text>
             </View>
             <View style={styles.orderList}>
-              {historyOrders.map(order => {
+              {historyOrders.length ? historyOrders.map(order => {
                 const trackable = isTrackableOrder(order);
                 const returnEligible = isReturnEligibleOrder(order);
                 return <Pressable key={order.id} onPress={() => openHistoryOrder(order)} style={styles.orderRow}>
@@ -1631,7 +1643,7 @@ function Storefront() {
                   <View style={[styles.orderStatusBadge, styles.orderCardStatusBadge, styles[`orderStatus${order.status}` as keyof typeof styles]]}><Text style={styles.orderStatusText}>{order.status}</Text></View>
                 </View>
                 {trackable ? <Pressable onPress={event => { event.stopPropagation(); openHistoryOrderAction(order, 'tracking'); }} style={[styles.orderSideAction, styles.orderSideTrack]}><Ionicons name="navigate-outline" size={24} color="#FFFFFF" /><Text style={styles.orderSideActionText}>Track</Text></Pressable> : returnEligible ? <Pressable onPress={event => { event.stopPropagation(); openHistoryOrderAction(order, 'return'); }} style={[styles.orderSideAction, styles.orderSideReturn]}><Ionicons name="return-down-back-outline" size={24} color="#FFFFFF" /><Text style={styles.orderSideActionText}>Return</Text></Pressable> : null}
-              </Pressable>})}
+              </Pressable>}) : <View style={styles.wishlistEmpty}><Ionicons name="receipt-outline" size={52} color={palette.blue} /><Text style={styles.wishlistEmptyTitle}>No orders yet</Text><Text style={styles.wishlistEmptyCopy}>Orders placed with this account will appear here.</Text><Pressable onPress={() => setScreen('home')} style={styles.wishlistShopButton}><Text style={styles.wishlistShopButtonText}>Start shopping</Text></Pressable></View>}
             </View>
           </View> : screen === 'offers' ? <View style={styles.offersPage}>
             <View style={styles.offersHeadingBlock}>
@@ -2240,7 +2252,7 @@ const styles = StyleSheet.create({
   deliveryEstimateValue: { fontWeight: '900' },
   codBox: { height: 48, marginTop: 12, borderWidth: 1.5, borderColor: '#2E8B36', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   codText: { color: '#22812E', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
-  paymentTrustBox: { height: 48, marginTop: 12, paddingHorizontal: 10, borderWidth: 1, borderColor: '#DDE1E7', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF' },
+  paymentTrustBox: { height: 48, marginTop: 12, paddingHorizontal: 10, borderWidth: 0, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF' },
   paymentLogoSlot: { flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' },
   paymentLogoImage: { width: 72, height: 44 },
   buyNowButton: { height: 48, marginTop: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2D2E' },
@@ -2274,10 +2286,13 @@ const styles = StyleSheet.create({
   similarTitle: { marginHorizontal: 14, marginTop: 24, fontFamily: 'Inter_400Regular', fontSize: 20, fontWeight: '900' },
   similarSubtitle: { marginHorizontal: 14, marginTop: 4, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 12 },
   detailRecommendations: { gap: 12, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 0 },
-  buyBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F5', borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3' },
+  buyBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F5F5', borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3' },
   buyBarPrice: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
   buyBarTax: { marginTop: 2, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 10 },
-  addLarge: { width: '56%', height: 46, borderRadius: 10, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  addLarge: { flex: 1, height: 46, borderRadius: 10, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  footerBuyNow: { flex: 1, height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2D2E' },
+  footerBuyNowDisabled: { opacity: 0.45 },
+  footerBuyNowText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
   notifyLarge: { backgroundColor: '#2E8B36' },
   addLargeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
   shareBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.42)' },
