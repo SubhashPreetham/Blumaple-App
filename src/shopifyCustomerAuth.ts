@@ -226,6 +226,11 @@ export function useShopifyCustomerAuth() {
     await promptGoogleAsync();
   }, [googleAndroidClientId, googleIosClientId, googleRequest, googleWebClientId, promptGoogleAsync]);
 
+  const refreshCustomer = useCallback(async () => {
+    if (!accessToken || customer?.authProvider !== 'shopify') return;
+    try { await loadLegacyCustomer(accessToken); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to refresh your account.'); }
+  }, [accessToken, customer?.authProvider, loadLegacyCustomer]);
+
   const logout = useCallback(async () => {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(GOOGLE_TOKEN_KEY);
@@ -233,5 +238,5 @@ export function useShopifyCustomerAuth() {
     setCustomer(null);
   }, []);
 
-  return { customer, isLoggedIn: Boolean(accessToken && customer), loading, error, login, loginWithGoogle, logout, redirectUri };
+  return { customer, accessToken, isLoggedIn: Boolean(accessToken && customer), loading, error, login, loginWithGoogle, refreshCustomer, logout, redirectUri };
 }

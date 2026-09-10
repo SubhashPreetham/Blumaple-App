@@ -3,6 +3,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  AppState,
   BackHandler,
   Dimensions,
   Easing,
@@ -28,7 +29,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, searchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
+import { createShopifyCartCheckout, fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, searchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AddressPage } from './pages/AddressPage';
 import { OrderResultPage } from './pages/OrderResultPage';
@@ -67,6 +68,7 @@ const footerDiscountTag = require('./assets/ui/offers.png');
 
 type Product = {
   id: string;
+  variantId?: string;
   name: string;
   price: string;
   oldPrice: string;
@@ -156,6 +158,7 @@ function mapShopifyProduct(product: ShopifyProduct): Product {
 
   return {
     id: product.id,
+    variantId: variant?.id,
     name: product.title,
     price: variant ? money(variant.price.amount, variant.price.currencyCode) : 'Unavailable',
     oldPrice: variant?.compareAtPrice ? money(variant.compareAtPrice.amount, variant.compareAtPrice.currencyCode) : '',
@@ -475,7 +478,7 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
 
 function CartPopup({ item, count, onOpen, containerStyle }: { item: Product | null; count: number; onOpen: () => void; containerStyle?: any }) {
   return <Animated.View pointerEvents="box-none" style={[styles.cartPopupLayer, containerStyle]}><Pressable onPress={onOpen} style={styles.cartPopup}>
-    {item ? <Image source={item.image} style={styles.cartPopupImage} resizeMode="contain" /> : <Ionicons name="cart" size={28} color="#FFFFFF" />}
+    <Ionicons name="bag-handle" size={28} color="#FFFFFF" />
     <View style={styles.cartPopupCopy}><Text style={styles.cartPopupTitle}>View cart</Text><Text style={styles.cartPopupCount}>{count} {count === 1 ? 'item' : 'items'}</Text></View>
     <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
   </Pressable></Animated.View>;
@@ -554,6 +557,10 @@ function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout,
 
 function Storefront() {
   const customerAuth = useShopifyCustomerAuth();
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') void customerAuth.refreshCustomer(); });
+    return () => subscription.remove();
+  }, [customerAuth.refreshCustomer]);
   const insets = useSafeAreaInsets();
   const floatingCartBottom = BOTTOM_NAV_HEIGHT + FLOATING_CART_GAP + insets.bottom;
   const screenWidth = Dimensions.get('window').width;
@@ -615,7 +622,8 @@ function Storefront() {
   const [shopifyError, setShopifyError] = useState<string | null>(null);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [shippingAddressRestored, setShippingAddressRestored] = useState(false);
-  const checkoutAddressKey = customerAuth.customer?.id ? `${CHECKOUT_ADDRESS_KEY}.${customerAuth.customer.id}` : `${CHECKOUT_ADDRESS_KEY}.guest`;
+  const secureCustomerId = customerAuth.customer?.id.replace(/[^A-Za-z0-9._-]/g, '_');
+  const checkoutAddressKey = secureCustomerId ? `${CHECKOUT_ADDRESS_KEY}.${secureCustomerId}` : `${CHECKOUT_ADDRESS_KEY}.guest`;
   const [checkoutInitialStage, setCheckoutInitialStage] = useState<2 | 3>(2);
   const [orderOutcome, setOrderOutcome] = useState<OrderOutcome | null>(null);
   const [pincodeModalVisible, setPincodeModalVisible] = useState(false);
@@ -635,16 +643,16 @@ function Storefront() {
   useEffect(() => {
     setShippingAddressRestored(false);
     setShippingAddress(null);
-    SecureStore.getItemAsync(checkoutAddressKey).then(value => {
+    SecureStore.getItemAsync(checkoutAddressKey).catch(() => null).then(value => {
       if (value) {
-        try { setShippingAddress(JSON.parse(value) as ShippingAddress); } catch { void SecureStore.deleteItemAsync(checkoutAddressKey); }
+        try { setShippingAddress(JSON.parse(value) as ShippingAddress); } catch { void SecureStore.deleteItemAsync(checkoutAddressKey).catch(() => {}); }
       }
     }).finally(() => setShippingAddressRestored(true));
   }, [checkoutAddressKey]);
 
   useEffect(() => {
     if (!shippingAddressRestored || !shippingAddress) return;
-    void SecureStore.setItemAsync(checkoutAddressKey, JSON.stringify(shippingAddress));
+    void SecureStore.setItemAsync(checkoutAddressKey, JSON.stringify(shippingAddress)).catch(() => {});
   }, [checkoutAddressKey, shippingAddress, shippingAddressRestored]);
 
   useEffect(() => {
@@ -963,7 +971,7 @@ function Storefront() {
       const product = variant?.product;
       const price = variant?.price;
       const imageUrl = variant?.image?.url || product?.featuredImage?.url;
-      return { id: variant?.id || `${order.id}-${index}`, name: product?.title || lineItem.title, price: price ? money(price.amount, price.currencyCode) : '', oldPrice: '', discount: '', image: imageUrl ? { uri: imageUrl } : require('./assets/figma/product-headphones.png'), vendor: product?.vendor || '', brand: product?.vendor || '', sku: variant?.sku || undefined, unitPrice: price ? Number(price.amount) : undefined, currencyCode: price?.currencyCode, handle: product?.handle };
+      return { id: product?.id || variant?.id || `${order.id}-${index}`, variantId: variant?.id, name: product?.title || lineItem.title, price: price ? money(price.amount, price.currencyCode) : '', oldPrice: '', discount: '', image: imageUrl ? { uri: imageUrl } : require('./assets/figma/product-headphones.png'), vendor: product?.vendor || '', brand: product?.vendor || '', sku: variant?.sku || undefined, unitPrice: price ? Number(price.amount) : undefined, currencyCode: price?.currencyCode, handle: product?.handle };
     });
     const addressLines = order.shippingAddress?.formatted || [];
     return { id: order.name, date: new Date(order.processedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }), products, amount: money(order.totalPrice.amount, order.totalPrice.currencyCode), status, shippingAddress: [...addressLines, order.shippingAddress?.phone].filter(Boolean).join(' · ') };
@@ -1441,7 +1449,7 @@ function Storefront() {
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
 
-  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => navigateBack('cart')} onAddress={() => setScreen('address')} onTestResult={(result) => { const orderItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; setOrderOutcome({ ...result, items: orderItems, orderId: result.success ? `BM/APP-${Math.floor(1000 + Math.random() * 9000)}` : undefined }); if (result.success) setCartItems([]); setScreen(result.success ? 'orderSuccess' : 'orderFailure'); }} /></Animated.View></SafeAreaView>;
+  if (screen === 'checkout' && selectedProduct) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CheckoutPage product={selectedProduct} quantity={Math.max(1, cartCount)} items={cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]} address={shippingAddress} initialStage={checkoutInitialStage} onBack={() => navigateBack('cart')} onAddress={() => setScreen('address')} onShopifyCheckout={async (_paymentMethod, discountCode) => { if (!shippingAddress) throw new Error('Add your delivery address before checkout.'); const checkoutItems = cartItems.length ? cartItems : [{ product: selectedProduct, quantity: Math.max(1, cartCount) }]; const checkout = await createShopifyCartCheckout(checkoutItems.map(item => ({ merchandiseId: item.product.variantId || '', quantity: item.quantity })), { firstName: shippingAddress.firstName, lastName: shippingAddress.lastName, company: shippingAddress.company, address1: shippingAddress.address1, address2: shippingAddress.address2, city: shippingAddress.city, province: shippingAddress.state, countryCode: shippingAddress.countryCode, zip: shippingAddress.pincode, phone: shippingAddress.phone.length === 10 ? `+91${shippingAddress.phone}` : shippingAddress.phone }, shippingAddress.email || customerAuth.customer?.emailAddress?.emailAddress || undefined, customerAuth.customer?.authProvider === 'shopify' ? customerAuth.accessToken || undefined : undefined, discountCode); await Linking.openURL(checkout.checkoutUrl); }} /></Animated.View></SafeAreaView>;
 
   if (screen === 'address') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><AddressPage initialAddress={shippingAddress} onBack={() => navigateBack('cart')} onSave={(address, stage) => { setShippingAddress(address); setCheckoutInitialStage(stage); setScreen('checkout'); }} /></Animated.View></SafeAreaView>;
 
@@ -1624,6 +1632,12 @@ function Storefront() {
             {categoryProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </ScrollView>
           </Animated.View>
+          {recentlyViewed.length ? <View style={styles.homeProductSections}>
+          <HomeSectionHeader title="Recently Viewed" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
+            {recentlyViewed.map(item => <ProductCard key={`recent-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
+          </ScrollView>
+          </View> : null}
 
           </> : screen === 'orders' ? <View style={styles.ordersPage}>
             <View style={styles.ordersHeadingBlock}>

@@ -267,15 +267,16 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
     if (!customer) return;
     setAddressStorageReady(false);
     const shopifyAddresses = (customer.addresses?.nodes || []).map((address, index) => ({ label: index === 0 ? 'Default' : `Address ${index + 1}`, name: address.firstName || customer.firstName || '', lastName: address.lastName || customer.lastName || '', email: customer.emailAddress?.emailAddress || '', phone: (address.phoneNumber || customer.phoneNumber?.phoneNumber || '').replace(/\D/g, '').slice(-10), company: address.company || '', building: address.address1 || '', line: address.address2 || '', city: address.city || '', state: address.zoneCode || '', pincode: address.zip || '' }));
-    const storageKey = `blumaple.profile.addresses.${customer.id}`;
-    SecureStore.getItemAsync(storageKey).then(value => {
+    const storageKey = `blumaple.profile.addresses.${customer.id.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+    SecureStore.getItemAsync(storageKey).catch(() => null).then(value => {
       if (!value) { setProfileAddresses(shopifyAddresses); return; }
       try { const stored = JSON.parse(value) as { saved?: ProfileAddress[]; billing?: ProfileAddress[] }; setProfileAddresses(stored.saved?.length ? stored.saved : shopifyAddresses); setBillingAddresses(stored.billing || []); } catch { setProfileAddresses(shopifyAddresses); }
     }).finally(() => setAddressStorageReady(true));
   }, [customer]);
   useEffect(() => {
     if (!customer || !addressStorageReady) return;
-    void SecureStore.setItemAsync(`blumaple.profile.addresses.${customer.id}`, JSON.stringify({ saved: profileAddresses, billing: billingAddresses }));
+    const safeCustomerId = customer.id.replace(/[^A-Za-z0-9._-]/g, '_');
+    void SecureStore.setItemAsync(`blumaple.profile.addresses.${safeCustomerId}`, JSON.stringify({ saved: profileAddresses, billing: billingAddresses })).catch(() => {});
   }, [addressStorageReady, billingAddresses, customer, profileAddresses]);
   const toggle = (key: keyof typeof notifications) => setNotifications(current => ({ ...current, [key]: !current[key] }));
   const setAddressValue = (key: keyof ProfileAddress, value: string) => setAddressForm(current => ({ ...current, [key]: value }));

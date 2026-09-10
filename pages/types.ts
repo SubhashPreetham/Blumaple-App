@@ -1,6 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 
-export type ShopProduct = { id: string; name: string; price: string; oldPrice: string; discount: string; image: ImageSourcePropType; vendor?: string };
+export type ShopProduct = { id: string; variantId?: string; name: string; price: string; oldPrice: string; discount: string; image: ImageSourcePropType; vendor?: string };
 export type BillingAddress = {
   gstin?: string;
   businessName?: string;

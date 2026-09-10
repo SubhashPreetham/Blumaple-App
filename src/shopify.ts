@@ -69,6 +69,9 @@ export type ShopifyProductPage = {
   endCursor: string | null;
 };
 
+export type ShopifyCartLineInput = { merchandiseId: string; quantity: number };
+export type ShopifyDeliveryInput = { firstName: string; lastName?: string; company?: string; address1: string; address2?: string; city: string; province?: string; countryCode: string; zip: string; phone?: string };
+
 const PRODUCTS_QUERY = `#graphql
   query MobileProducts($first: Int!, $after: String) {
     products(first: $first, after: $after) {
@@ -187,6 +190,31 @@ const COLLECTION_PRODUCT_COUNT_QUERY = `#graphql
 
 function normalizeDomain(value: string) {
   return value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
+export async function createShopifyCartCheckout(lines: ShopifyCartLineInput[], address: ShopifyDeliveryInput, email?: string, customerAccessToken?: string, discountCode?: string) {
+  const domain = process.env.EXPO_PUBLIC_SHOPIFY_STORE_DOMAIN?.trim();
+  const token = process.env.EXPO_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN?.trim();
+  if (!domain || !token) throw new Error('Shopify checkout is not configured.');
+  if (!lines.length || lines.some(line => !line.merchandiseId)) throw new Error('One or more products cannot be checked out. Please refresh the catalog and try again.');
+  const query = `#graphql
+    mutation MobileCartCreate($input: CartInput!) {
+      cartCreate(input: $input) {
+        cart { id checkoutUrl }
+        userErrors { field message }
+      }
+    }
+  `;
+  const buyerIdentity: Record<string, unknown> = { countryCode: address.countryCode, deliveryAddressPreferences: [{ deliveryAddress: address }] };
+  if (email) buyerIdentity.email = email;
+  if (customerAccessToken) buyerIdentity.customerAccessToken = customerAccessToken;
+  const input: Record<string, unknown> = { lines, buyerIdentity };
+  if (discountCode?.trim()) input.discountCodes = [discountCode.trim().toUpperCase()];
+  const response = await fetch(`https://${normalizeDomain(domain)}/api/2026-01/graphql.json`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Storefront-Access-Token': token }, body: JSON.stringify({ query, variables: { input } }) });
+  const payload = await response.json() as { data?: { cartCreate?: { cart?: { id: string; checkoutUrl: string } | null; userErrors?: Array<{ message: string }> } }; errors?: Array<{ message: string }> };
+  const errors = [...(payload.errors || []), ...(payload.data?.cartCreate?.userErrors || [])];
+  if (!response.ok || errors.length || !payload.data?.cartCreate?.cart?.checkoutUrl) throw new Error(errors.map(item => item.message).join('\n') || `Unable to create checkout (${response.status}).`);
+  return payload.data.cartCreate.cart;
 }
 
 export async function fetchShopifyProducts(first = 20): Promise<ShopifyProduct[]> {
