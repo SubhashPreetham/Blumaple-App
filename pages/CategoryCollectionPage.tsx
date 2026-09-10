@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from '../src/shopify';
@@ -8,6 +8,9 @@ type Props = {
   selectedCollection: ShopifyMenuItem;
   previews: Record<string, ShopifyCollectionPreview>;
   products: ShopifyProduct[];
+  brands: string[];
+  shippingOptions: string[];
+  filterDataLoading: boolean;
   loading: boolean;
   totalProducts: number | null;
   loadingMore: boolean;
@@ -16,6 +19,7 @@ type Props = {
   onBack: () => void;
   onSelectCollection: (collection: ShopifyMenuItem) => void;
   onLoadMore: () => void;
+  onApplyFilters: (brands: string[], vendors: string[]) => void;
   onAdd: (product: ShopifyProduct) => void;
   onToggleFavorite: (product: ShopifyProduct) => void;
   onOpenProduct: (product: ShopifyProduct) => void;
@@ -47,12 +51,14 @@ function CollectionCartonLoader() {
   return <View style={s.collectionLoader} accessibilityLabel="Loading products"><View style={{ width: 46, height: 46 }}><Animated.View style={{ position: 'absolute', opacity: closed }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View><Animated.View style={{ position: 'absolute', opacity: open, transform: [{ translateY: lift }] }}><MaterialCommunityIcons name="package-variant" size={46} color="#B97435" /></Animated.View></View></View>;
 }
 
-export function CategoryCollectionPage({ category, selectedCollection, previews, products, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, onBack, onSelectCollection, onLoadMore, onAdd, onToggleFavorite, onOpenProduct }: Props) {
+export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onToggleFavorite, onOpenProduct }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('Recommended');
   const [filterVisible, setFilterVisible] = useState(false);
   const [sortVisible, setSortVisible] = useState(false);
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [selectedShipping, setSelectedShipping] = useState<Set<string>>(new Set());
+  const [appliedBrands, setAppliedBrands] = useState<Set<string>>(new Set());
+  const [appliedShipping, setAppliedShipping] = useState<Set<string>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [notifiedIds, setNotifiedIds] = useState<Set<string>>(new Set());
@@ -80,13 +86,15 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   useEffect(() => {
     setSelectedBrands(new Set());
     setSelectedShipping(new Set());
+    setAppliedBrands(new Set());
+    setAppliedShipping(new Set());
   }, [selectedCollection.id]);
 
   useEffect(() => () => {
     if (notifyTimer.current) clearTimeout(notifyTimer.current);
   }, []);
 
-  const requestNotification = (productId: string) => {
+  const requestNotification = useCallback((productId: string) => {
     if (notifyTimer.current) clearTimeout(notifyTimer.current);
     if (notifiedIds.has(productId)) {
       setNotifiedIds(current => {
@@ -104,11 +112,9 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
       setNotifyMessageId(null);
       notifyTimer.current = null;
     }, 1000);
-  };
+  }, [notifiedIds]);
 
-  const brands = useMemo(() => [...new Set(products.map(product => product.brandName?.value.trim() ?? '').filter(Boolean))].sort(), [products]);
-  const shippingOptions = useMemo(() => [...new Set(products.map(product => product.vendor.trim()).filter(Boolean))].sort(), [products]);
-  const activeFilterCount = selectedBrands.size + selectedShipping.size;
+  const activeFilterCount = appliedBrands.size + appliedShipping.size;
   const selectedSortLabel = sortOptions.find(option => option.value === sortMode)?.label ?? 'Recommended';
 
   const visibleProducts = useMemo(() => {
@@ -116,15 +122,15 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
       const query = searchQuery.trim().toLowerCase();
       if (query && !`${product.title} ${product.vendor} ${product.brandName?.value ?? ''}`.toLowerCase().includes(query)) return false;
       const brand = product.brandName?.value.trim() ?? '';
-      if (selectedBrands.size && !selectedBrands.has(brand)) return false;
-      if (selectedShipping.size && !selectedShipping.has(product.vendor.trim())) return false;
+      if (appliedBrands.size && !appliedBrands.has(brand)) return false;
+      if (appliedShipping.size && !appliedShipping.has(product.vendor.trim())) return false;
       return true;
     });
     if (sortMode === 'Price: Low') filtered.sort((a, b) => Number(a.variants.nodes[0]?.price.amount ?? 0) - Number(b.variants.nodes[0]?.price.amount ?? 0));
     if (sortMode === 'Price: High') filtered.sort((a, b) => Number(b.variants.nodes[0]?.price.amount ?? 0) - Number(a.variants.nodes[0]?.price.amount ?? 0));
     if (sortMode === 'Name') filtered.sort((a, b) => a.title.localeCompare(b.title));
     return filtered;
-  }, [products, searchQuery, selectedBrands, selectedShipping, sortMode]);
+  }, [products, searchQuery, appliedBrands, appliedShipping, sortMode]);
 
   const toggleBrand = (brand: string) => setSelectedBrands(current => {
     const next = new Set(current);
@@ -137,7 +143,37 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     return next;
   });
   const clearFilters = () => { setSelectedBrands(new Set()); setSelectedShipping(new Set()); };
+  const applyFilters = () => {
+    const brandsToApply = [...selectedBrands];
+    const shippingToApply = [...selectedShipping];
+    setAppliedBrands(new Set(brandsToApply));
+    setAppliedShipping(new Set(shippingToApply));
+    setFilterVisible(false);
+    onApplyFilters(brandsToApply, shippingToApply);
+  };
   const collections = category.items.length ? category.items : [category];
+  const productGrid = useMemo(() => <View style={s.productGrid}>
+    {visibleProducts.map(product => {
+      const variant = product.variants.nodes[0];
+      const imageUrl = product.images.nodes[0]?.url;
+      const price = Number(variant?.price.amount ?? 0);
+      const compareAtPrice = Number(variant?.compareAtPrice?.amount ?? 0);
+      const hasDiscount = compareAtPrice > price && price > 0;
+      const discountPercent = hasDiscount ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100) : 0;
+      const availableForSale = variant?.availableForSale ?? false;
+      return <View key={product.id} style={s.productCard}>
+        <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
+          {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
+          {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>-{discountPercent}%</Text></View> : null}
+          <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={20} color={favoriteIds.has(product.id) ? '#B85C5C' : '#3F72E5'} /></Pressable>
+          <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View>{notifyMessageId === product.id ? <View pointerEvents="none" style={s.notifyToast}><Text style={s.notifyToastText}>We&apos;ll notify you</Text></View> : null}</View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
+        </Pressable>
+        <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
+        <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={[s.price, hasDiscount && s.discountedPrice]}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
+      </View>;
+    })}
+    {!visibleProducts.length ? <Text style={s.empty}>No products match this filter.</Text> : null}
+  </View>, [favoriteIds, notifiedIds, notifyMessageId, onAdd, onOpenProduct, onToggleFavorite, requestNotification, visibleProducts]);
 
   return <View style={s.page}>
     <View style={[s.header, { backgroundColor: '#0A254A', borderColor: '#294565' }]}>
@@ -169,35 +205,9 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
           <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
         </View>
-        <View style={s.selectedHeading}><Text style={s.selectedTitle}>{selectedCollection.title.trim()}</Text><Text style={s.resultCount}>{totalProducts ?? products.length} products</Text></View>
+        <View style={s.selectedHeading}><Text style={s.selectedTitle}>{selectedCollection.title.trim()}</Text><Text style={s.resultCount}>{totalProducts === null ? 'Loading count…' : `${totalProducts} products`}</Text></View>
         <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll}>
-          {loading ? <CollectionCartonLoader /> : <View style={s.productGrid}>
-            {visibleProducts.map(product => {
-              const variant = product.variants.nodes[0];
-              const imageUrl = product.images.nodes[0]?.url;
-              const price = Number(variant?.price.amount ?? 0);
-              const compareAtPrice = Number(variant?.compareAtPrice?.amount ?? 0);
-              const hasDiscount = compareAtPrice > price && price > 0;
-              const discountPercent = hasDiscount ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100) : 0;
-              const availableForSale = variant?.availableForSale ?? false;
-              return <View key={product.id} style={s.productCard}>
-                <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
-                  {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
-                  {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>-{discountPercent}%</Text></View> : null}
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}>
-                    <Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={20} color={favoriteIds.has(product.id) ? '#B85C5C' : '#3F72E5'} />
-                  </Pressable>
-                <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View>{notifyMessageId === product.id ? <View pointerEvents="none" style={s.notifyToast}><Text style={s.notifyToastText}>We&apos;ll notify you</Text></View> : null}</View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
-                </Pressable>
-                <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
-                <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}>
-                  <Text style={[s.price, hasDiscount && s.discountedPrice]}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>
-                  {hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}
-                </View>
-              </View>;
-            })}
-            {!visibleProducts.length ? <Text style={s.empty}>No products match this filter.</Text> : null}
-          </View>}
+          {loading ? <CollectionCartonLoader /> : productGrid}
           {!loading && hasNextPage ? <Pressable disabled={loadingMore} onPress={onLoadMore} style={[s.loadMoreButton, loadingMore && s.loadMoreButtonDisabled]}>
             {loadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={s.loadMoreButtonText}>Load more</Text>}
           </Pressable> : null}
@@ -209,13 +219,14 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
         <Pressable style={s.filterSheet} onPress={() => {}}>
           <View style={s.filterHeader}><Text style={s.filterTitle}>Filters</Text><Pressable onPress={() => setFilterVisible(false)}><Ionicons name="close" size={26} color="#1A1C1D" /></Pressable></View>
           <View style={s.filterBody}>
+            {filterDataLoading ? <View style={{ paddingVertical: 14 }}><ActivityIndicator size="small" color="#3F72E5" /><Text style={[s.noOptions, { textAlign: 'center', marginTop: 8 }]}>Loading all collection filters…</Text></View> : null}
             <Text style={s.filterSectionTitle}>Brand</Text>
             <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={s.brandOptions} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.filterOptionsContent}>
               {brands.map(brand => <Pressable key={brand} onPress={() => toggleBrand(brand)} style={s.filterOption}>
                 <View style={[s.checkbox, selectedBrands.has(brand) && s.checkboxSelected]}>{selectedBrands.has(brand) ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}</View>
                 <Text style={s.filterOptionText}>{brand}</Text>
               </Pressable>)}
-              {!brands.length ? <Text style={s.noOptions}>No brand information available.</Text> : null}
+              {!filterDataLoading && !brands.length ? <Text style={s.noOptions}>No brand information available.</Text> : null}
             </ScrollView>
             <View style={s.filterDivider} />
             <Text style={s.filterSectionTitle}>Shipping</Text>
@@ -223,9 +234,9 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
               <View style={[s.checkbox, selectedShipping.has(option) && s.checkboxSelected]}>{selectedShipping.has(option) ? <Ionicons name="checkmark" size={16} color="#FFFFFF" /> : null}</View>
               <Text style={s.filterOptionText}>{option}</Text>
             </Pressable>)}
-            {!shippingOptions.length ? <Text style={s.noOptions}>No shipping information available.</Text> : null}
+            {!filterDataLoading && !shippingOptions.length ? <Text style={s.noOptions}>No shipping information available.</Text> : null}
           </View>
-          <View style={s.filterActions}><Pressable onPress={clearFilters} style={s.clearButton}><Text style={s.clearButtonText}>Clear all</Text></Pressable><Pressable onPress={() => setFilterVisible(false)} style={s.applyButton}><Text style={s.applyButtonText}>Show {visibleProducts.length} products</Text></Pressable></View>
+          <View style={s.filterActions}><Pressable onPress={clearFilters} style={s.clearButton}><Text style={s.clearButtonText}>Clear all</Text></Pressable><Pressable disabled={filterDataLoading} onPress={applyFilters} style={[s.applyButton, filterDataLoading && { opacity: 0.55 }]}><Text style={s.applyButtonText}>{filterDataLoading ? 'Loading filters…' : 'Show products'}</Text></Pressable></View>
         </Pressable>
       </Pressable>
     </Modal>

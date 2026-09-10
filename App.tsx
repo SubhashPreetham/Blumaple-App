@@ -29,7 +29,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createShopifyCartCheckout, fetchShopifyCollectionPreviews, fetchShopifyCollectionProductCount, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, searchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from './src/shopify';
+import { createShopifyCartCheckout, fetchShopifyCollectionFilters, fetchShopifyCollectionPreviews, fetchShopifyCollectionProducts, fetchShopifyMainMenu, fetchShopifyProducts, searchShopifyProducts, ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct, ShopifyProductFilter } from './src/shopify';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AddressPage } from './pages/AddressPage';
 import { OrderResultPage } from './pages/OrderResultPage';
@@ -610,6 +610,10 @@ function Storefront() {
   const [selectedCategoryGroup, setSelectedCategoryGroup] = useState<ShopifyMenuItem | null>(null);
   const [selectedCollectionItem, setSelectedCollectionItem] = useState<ShopifyMenuItem | null>(null);
   const [collectionPageProducts, setCollectionPageProducts] = useState<ShopifyProduct[]>([]);
+  const [collectionBrands, setCollectionBrands] = useState<string[]>([]);
+  const [collectionVendors, setCollectionVendors] = useState<string[]>([]);
+  const [collectionActiveFilters, setCollectionActiveFilters] = useState<ShopifyProductFilter[]>([]);
+  const [collectionFilterLoading, setCollectionFilterLoading] = useState(false);
   const [collectionPageLoading, setCollectionPageLoading] = useState(false);
   const [collectionPageLoadingMore, setCollectionPageLoadingMore] = useState(false);
   const [collectionPageHasNext, setCollectionPageHasNext] = useState(false);
@@ -1170,6 +1174,10 @@ function Storefront() {
     let cancelled = false;
     setCollectionPageLoading(true);
     setCollectionPageProducts([]);
+    setCollectionBrands([]);
+    setCollectionVendors([]);
+    setCollectionActiveFilters([]);
+    setCollectionFilterLoading(true);
     setCollectionPageHasNext(false);
     setCollectionPageCursor(null);
     setCollectionPageTotal(null);
@@ -1187,9 +1195,15 @@ function Storefront() {
         setCollectionPageCursor(null);
       })
       .finally(() => { if (!cancelled) setCollectionPageLoading(false); });
-    fetchShopifyCollectionProductCount(collectionId)
-      .then(total => { if (!cancelled) setCollectionPageTotal(total); })
-      .catch(() => undefined);
+    fetchShopifyCollectionFilters(collectionId)
+      .then(metadata => {
+        if (cancelled) return;
+        setCollectionBrands(metadata.brands);
+        setCollectionVendors(metadata.vendors);
+        setCollectionPageTotal(metadata.total);
+      })
+      .catch(() => { if (!cancelled) { setCollectionBrands([]); setCollectionVendors([]); } })
+      .finally(() => { if (!cancelled) setCollectionFilterLoading(false); });
     return () => { cancelled = true; };
   }, [screen, selectedCollectionItem]);
 
@@ -1197,7 +1211,7 @@ function Storefront() {
     const collectionId = selectedCollectionItem?.resource?.id;
     if (!collectionId || !collectionPageHasNext || !collectionPageCursor || collectionPageLoadingMore) return;
     setCollectionPageLoadingMore(true);
-    fetchShopifyCollectionProducts(collectionId, 30, collectionPageCursor)
+    fetchShopifyCollectionProducts(collectionId, 30, collectionPageCursor, collectionActiveFilters)
       .then(page => {
         setCollectionPageProducts(current => {
           const existingIds = new Set(current.map(product => product.id));
@@ -1208,6 +1222,28 @@ function Storefront() {
       })
       .catch(() => undefined)
       .finally(() => setCollectionPageLoadingMore(false));
+  };
+
+  const applyCollectionFilters = (brands: string[], vendors: string[]) => {
+    const collectionId = selectedCollectionItem?.resource?.id;
+    if (!collectionId) return;
+    const filters: ShopifyProductFilter[] = [
+      ...brands.map(value => ({ productMetafield: { namespace: 'custom', key: 'brand_name', value } })),
+      ...vendors.map(productVendor => ({ productVendor })),
+    ];
+    setCollectionActiveFilters(filters);
+    setCollectionPageLoading(true);
+    setCollectionPageProducts([]);
+    setCollectionPageHasNext(false);
+    setCollectionPageCursor(null);
+    fetchShopifyCollectionProducts(collectionId, 30, null, filters)
+      .then(page => {
+        setCollectionPageProducts(page.products);
+        setCollectionPageHasNext(page.hasNextPage);
+        setCollectionPageCursor(page.endCursor);
+      })
+      .catch(() => setCollectionPageProducts([]))
+      .finally(() => setCollectionPageLoading(false));
   };
 
   useEffect(() => {
@@ -1293,6 +1329,10 @@ function Storefront() {
     // Clear stale results before this screen becomes visible. The fetch effect
     // then fills it with this collection's actual products.
     setCollectionPageProducts([]);
+    setCollectionBrands([]);
+    setCollectionVendors([]);
+    setCollectionActiveFilters([]);
+    setCollectionFilterLoading(true);
     setCollectionPageTotal(null);
     setCollectionPageLoading(true);
     setSelectedCategoryGroup(category);
@@ -1405,15 +1445,23 @@ function Storefront() {
       selectedCollection={selectedCollectionItem}
       previews={shopifyCollectionPreviews}
       products={collectionPageProducts}
+      brands={collectionBrands}
+      shippingOptions={collectionVendors}
+      filterDataLoading={collectionFilterLoading}
       loading={collectionPageLoading}
       totalProducts={collectionPageTotal}
       loadingMore={collectionPageLoadingMore}
       hasNextPage={collectionPageHasNext}
       favoriteIds={favorites}
       onLoadMore={loadMoreCollectionProducts}
+      onApplyFilters={applyCollectionFilters}
       onBack={() => navigateBack(categoryCollectionReturnScreen)}
       onSelectCollection={collection => {
         setCollectionPageProducts([]);
+        setCollectionBrands([]);
+        setCollectionVendors([]);
+        setCollectionActiveFilters([]);
+        setCollectionFilterLoading(true);
         setCollectionPageTotal(null);
         setCollectionPageLoading(true);
         setSelectedCollectionItem(collection);
