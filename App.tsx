@@ -281,7 +281,7 @@ function SectionTitle({ children }: React.PropsWithChildren) {
 }
 
 function HomeSectionHeader({ title, action = 'View all', showAction = true }: { title: string; action?: string; showAction?: boolean }) {
-  return <View style={[styles.homeSectionHeader, !showAction && styles.homeSectionHeaderFull]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={styles.homeSectionTitle}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
+  return <View style={[styles.homeSectionHeader, !showAction && styles.homeSectionHeaderFull]}><Text numberOfLines={1} ellipsizeMode="clip" style={[styles.homeSectionTitle, !showAction && styles.homeSectionTitleFull]}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
 }
 
 function HomeProductListingPage({ title, products, favoriteIds, onBack, onFavorite, onAdd, onOpen }: { title: string; products: Product[]; favoriteIds: Set<string>; onBack: () => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
@@ -1706,21 +1706,21 @@ function Storefront() {
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeTrendingEntrance, transform: [{ translateY: homeTrendingTranslateY }] }]}>
           <HomeSectionHeader title="Trending" showAction={false} />
-          <View style={styles.homeProductGrid}>
-            {categoryProducts.slice(0, 2).map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
-          </View>
-          {categoryProducts.length > 2 ? <Pressable onPress={() => { setHomeProductListing('trending'); setScreen('homeProducts'); }} style={({ pressed }) => [styles.homeViewAllButton, pressed && styles.pressed]}><Text style={styles.homeViewAllText}>View All</Text><Ionicons name="arrow-forward" size={20} color={palette.heading} /></Pressable> : null}
+          <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} directionalLockEnabled bounces alwaysBounceHorizontal decelerationRate="normal" scrollEventThrottle={16} overScrollMode="never" contentContainerStyle={styles.homeProductHorizontalRow}>
+            {categoryProducts.map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
+          </ScrollView>
+          {categoryProducts.length > 2 ? <Pressable onPress={() => { setHomeProductListing('trending'); setScreen('homeProducts'); }} style={({ pressed }) => [styles.homeViewAllButton, pressed && styles.pressed]}><Text style={styles.homeViewAllText}>View All</Text><Ionicons name="arrow-forward" size={20} color={palette.blue} /></Pressable> : null}
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeBestSellingEntrance, transform: [{ translateY: homeBestSellingTranslateY }] }]}>
           <HomeSectionHeader title="Best Selling" showAction={false} />
-          <View style={styles.homeProductGrid}>
-            {bestSellingHomeProducts.slice(0, 2).map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
-          </View>
-          {bestSellingHomeProducts.length > 2 ? <Pressable onPress={() => { setHomeProductListing('bestSelling'); setScreen('homeProducts'); }} style={({ pressed }) => [styles.homeViewAllButton, pressed && styles.pressed]}><Text style={styles.homeViewAllText}>View All</Text><Ionicons name="arrow-forward" size={20} color={palette.heading} /></Pressable> : null}
+          <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} directionalLockEnabled bounces alwaysBounceHorizontal decelerationRate="normal" scrollEventThrottle={16} overScrollMode="never" contentContainerStyle={styles.homeProductHorizontalRow}>
+            {bestSellingHomeProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
+          </ScrollView>
+          {bestSellingHomeProducts.length > 2 ? <Pressable onPress={() => { setHomeProductListing('bestSelling'); setScreen('homeProducts'); }} style={({ pressed }) => [styles.homeViewAllButton, pressed && styles.pressed]}><Text style={styles.homeViewAllText}>View All</Text><Ionicons name="arrow-forward" size={20} color={palette.blue} /></Pressable> : null}
           </Animated.View>
           {recentlyViewed.length ? <View style={styles.homeProductSections}>
           <HomeSectionHeader title="Recently Viewed" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingProductRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.homeProductHorizontalRow}>
             {recentlyViewed.map(item => <ProductCard key={`recent-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </ScrollView>
           </View> : null}
@@ -1789,7 +1789,7 @@ function Storefront() {
           </Pressable>
           <Pressable onPress={() => openFooterPage('categories')} style={[styles.footerTab, activeFooterTab === 'categories' && styles.footerTabSelected]}>
             <Ionicons name={activeFooterTab === 'categories' ? 'grid' : 'grid-outline'} size={25} color={activeFooterTab === 'categories' ? palette.blue : palette.muted} />
-            <Text style={[styles.footerTabText, activeFooterTab === 'categories' && styles.footerTabActive]}>Categories</Text>
+            <Text style={[styles.footerTabText, activeFooterTab === 'categories' && styles.footerTabActive]}>Explore</Text>
           </Pressable>
           <Pressable onPress={() => openFooterPage('orders')} style={[styles.footerTab, activeFooterTab === 'orders' && styles.footerTabSelected]}>
             <Ionicons name={activeFooterTab === 'orders' ? 'bag-handle' : 'bag-handle-outline'} size={25} color={activeFooterTab === 'orders' ? palette.blue : '#555'} />
@@ -2028,9 +2028,9 @@ const styles = StyleSheet.create({
   blinkDivider: { marginTop: 15, marginHorizontal: 0, paddingVertical: 12, alignItems: 'center', backgroundColor: '#EEF3FF' },
   blinkDividerText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
-  homeProductGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18, paddingBottom: 12 },
-  homeViewAllButton: { height: 48, marginTop: 4, marginBottom: 10, borderWidth: 1.25, borderColor: palette.heading, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: palette.white },
-  homeViewAllText: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '700' },
+  homeProductHorizontalRow: { gap: 12, paddingBottom: 12 },
+  homeViewAllButton: { height: 48, marginTop: 4, marginBottom: 10, paddingHorizontal: 18, borderWidth: 1.25, borderColor: palette.blue, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: palette.white },
+  homeViewAllText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '700' },
   homeListingPage: { flex: 1, backgroundColor: palette.white },
   homeListingHeader: { height: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#0A254A' },
   homeListingBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -2055,7 +2055,8 @@ const styles = StyleSheet.create({
   homeProductSections: { paddingHorizontal: 16, paddingBottom: 8, backgroundColor: palette.white },
   homeSectionHeader: { minHeight: 62, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   homeSectionHeaderFull: { justifyContent: 'flex-start' },
-  homeSectionTitle: { flexShrink: 0, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.25 },
+  homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.25 },
+  homeSectionTitleFull: { width: '100%', flexShrink: 0 },
   homeSectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   homeSectionActionText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', rowGap: 13 },
