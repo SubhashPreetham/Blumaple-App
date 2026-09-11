@@ -195,16 +195,12 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
             <View style={[s.collectionImageBlock, active && s.collectionImageBlockActive]}>
               <View style={s.collectionImageClip}>{imageUrl ? <Image source={{ uri: imageUrl }} style={s.collectionImage} resizeMode="contain" /> : <Ionicons name="image-outline" size={25} color="#8D9AAF" />}</View>
             </View>
-            <Text numberOfLines={3} style={[s.collectionName, active && s.collectionNameActive]}>{collection.title.trim()}</Text>
+            <Text numberOfLines={2} style={[s.collectionName, active && s.collectionNameActive]}>{collection.title.trim()}</Text>
           </Pressable>;
         })}
       </ScrollView>
 
       <View style={s.productsPanel}>
-        <View style={s.controls}>
-          <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
-          <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
-        </View>
         <View style={s.selectedHeading}><Text style={s.selectedTitle}>{selectedCollection.title.trim()}</Text><Text style={s.resultCount}>{totalProducts === null ? 'Loading count…' : `${totalProducts} products`}</Text></View>
         <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll}>
           {loading ? <CollectionCartonLoader /> : <View style={s.productGrid}>
@@ -240,6 +236,10 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           </Pressable> : null}
         </ScrollView>
       </View>
+    </View>
+    <View style={s.controls}>
+      <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
+      <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
     </View>
     <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={() => setFilterVisible(false)}>
       <Pressable style={s.filterBackdrop} onPress={() => setFilterVisible(false)}>
@@ -300,17 +300,17 @@ const s = StyleSheet.create({
   searchIconButtonOpen: { backgroundColor: '#FFFFFF' },
   content: { flex: 1 },
   collectionRail: { flexGrow: 0, backgroundColor: '#F3F6FA', borderBottomWidth: 1, borderColor: '#DDE3EB' },
-  collectionRailContent: { paddingHorizontal: 10, paddingVertical: 10, gap: 8 },
-  collectionRailItem: { width: 94, minHeight: 104, paddingHorizontal: 5, paddingVertical: 7, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 12 },
+  collectionRailContent: { paddingHorizontal: 10, paddingVertical: 7, gap: 7 },
+  collectionRailItem: { width: 82, minHeight: 84, paddingHorizontal: 4, paddingVertical: 5, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 10 },
   collectionRailItemActive: { borderColor: '#285FCB', backgroundColor: '#3F72E5' },
-  collectionImageBlock: { width: 62, height: 62, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.13, shadowRadius: 4, elevation: 3 },
+  collectionImageBlock: { width: 50, height: 50, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.11, shadowRadius: 3, elevation: 2 },
   collectionImageBlockActive: { backgroundColor: '#FFFFFF' },
-  collectionImageClip: { width: '100%', height: '100%', borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  collectionImageClip: { width: '100%', height: '100%', borderRadius: 9, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   collectionImage: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
-  collectionName: { marginTop: 6, color: '#555555', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 13, textAlign: 'center', fontWeight: '600' },
+  collectionName: { marginTop: 4, color: '#555555', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 11, textAlign: 'center', fontWeight: '700' },
   collectionNameActive: { color: '#FFFFFF', fontWeight: '900' },
   productsPanel: { flex: 1, backgroundColor: '#FFFFFF' },
-  controls: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 7 },
+  controls: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#DDE2E8', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 10 },
   control: { flex: 1, minWidth: 0, height: 42, paddingHorizontal: 8, borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF' },
   controlActive: { borderColor: '#3F72E5', backgroundColor: '#3F72E5' },
   controlText: { flexShrink: 1, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },

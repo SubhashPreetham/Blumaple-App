@@ -91,7 +91,7 @@ type Product = {
 type CartItem = { product: Product; quantity: number };
 type HistoryOrder = { id: string; date: string; products: Product[]; amount: string; status: 'Delivered' | 'Shipped' | 'Processing' | 'Cancelled' | 'Returned'; deliveredAt?: string; shippingAddress: string };
 type OrderOutcome = { success: boolean; orderId?: string; items: CartItem[]; paymentMethod: 'online' | 'cod'; total: number; tax: number; codFee: number };
-type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'homeProducts' | 'product' | 'cart';
+type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'discoverySearch' | 'homeProducts' | 'product' | 'cart';
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
@@ -284,7 +284,7 @@ function HomeSectionHeader({ title, action = 'View all', showAction = true }: { 
   return <View style={[styles.homeSectionHeader, !showAction && styles.homeSectionHeaderFull]}><Text numberOfLines={1} ellipsizeMode="clip" style={[styles.homeSectionTitle, !showAction && styles.homeSectionTitleFull]}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
 }
 
-function HomeProductListingPage({ title, products, favoriteIds, onBack, onFavorite, onAdd, onOpen }: { title: string; products: Product[]; favoriteIds: Set<string>; onBack: () => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
+function HomeProductListingPage({ title, products, favoriteIds, cartCount, onBack, onFavorite, onAdd, onOpen, onOpenSearch, onOpenCart, onOpenWishlist }: { title: string; products: Product[]; favoriteIds: Set<string>; cartCount: number; onBack: () => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void; onOpenSearch: () => void; onOpenCart: () => void; onOpenWishlist: () => void }) {
   const [sort, setSort] = useState<'Recommended' | 'Price: Low' | 'Price: High' | 'Name'>('Recommended');
   const [filter, setFilter] = useState<'All' | 'In stock' | 'On offer'>('All');
   const [panel, setPanel] = useState<'sort' | 'filter' | null>(null);
@@ -300,12 +300,32 @@ function HomeProductListingPage({ title, products, favoriteIds, onBack, onFavori
   const selectedOption = panel === 'sort' ? sort : filter;
 
   return <View style={styles.homeListingPage}>
-    <View style={styles.homeListingHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.homeListingBack}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable><View><Text style={styles.homeListingHeaderTitle}>{title}</Text><Text style={styles.homeListingHeaderCopy}>{visibleProducts.length} products</Text></View></View>
+    <View style={styles.homeListingHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.homeListingBack}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable><View style={styles.homeListingHeaderCopyBlock}><Text style={styles.homeListingHeaderTitle}>{title}</Text><Text style={styles.homeListingHeaderCopy}>{visibleProducts.length} products</Text></View><View style={styles.homeListingHeaderActions}><Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={styles.homeListingHeaderAction}><Ionicons name="search-outline" size={24} color={palette.white} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist, ${favoriteIds.size} products`} onPress={onOpenWishlist} style={styles.homeListingHeaderAction}><Ionicons name={favoriteIds.size ? 'heart' : 'heart-outline'} size={23} color={palette.white} />{favoriteIds.size ? <View style={styles.homeListingBadge}><Text style={styles.homeListingBadgeText}>{favoriteIds.size > 99 ? '99+' : favoriteIds.size}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open cart, ${cartCount} items`} onPress={onOpenCart} style={styles.homeListingHeaderAction}><Ionicons name="bag-handle-outline" size={23} color={palette.white} />{cartCount ? <View style={styles.homeListingBadge}><Text style={styles.homeListingBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable></View></View>
     <View style={styles.homeListingBody}>
       {visibleProducts.length ? <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.homeListingProductScroll}><View style={styles.homeListingProductGrid}>{visibleProducts.map(product => <ProductCard key={`${title}-${product.id}`} item={product} width={cardWidth} favorite={favoriteIds.has(product.id)} collectionLayout onFavorite={() => onFavorite(product)} onAdd={() => onAdd(product)} onOpen={() => onOpen(product)} />)}</View></ScrollView> : <View style={styles.homeListingEmpty}><Ionicons name="cube-outline" size={45} color={palette.blue} /><Text style={styles.homeListingEmptyText}>No products match this filter.</Text></View>}
     </View>
     <View style={styles.homeListingBottomBar}><Pressable onPress={() => setPanel('filter')} style={styles.homeListingControl}><Ionicons name="options-outline" size={20} color={palette.heading} /><Text style={styles.homeListingControlText}>Filters{filter !== 'All' ? ` · ${filter}` : ''}</Text></Pressable><View style={styles.homeListingControlDivider} /><Pressable onPress={() => setPanel('sort')} style={styles.homeListingControl}><Ionicons name="swap-vertical" size={20} color={palette.heading} /><Text style={styles.homeListingControlText}>Sort{sort !== 'Recommended' ? ` · ${sort}` : ''}</Text></Pressable></View>
     <Modal visible={panel !== null} transparent animationType="slide" onRequestClose={() => setPanel(null)}><Pressable style={styles.homeListingModalBackdrop} onPress={() => setPanel(null)}><Pressable style={styles.homeListingSheet} onPress={() => {}}><View style={styles.homeListingSheetHeader}><Text style={styles.homeListingSheetTitle}>{panel === 'sort' ? 'Sort products' : 'Filter products'}</Text><Pressable onPress={() => setPanel(null)}><Ionicons name="close" size={25} color={palette.heading} /></Pressable></View>{options.map(option => <Pressable key={option} onPress={() => { if (panel === 'sort') setSort(option as typeof sort); else setFilter(option as typeof filter); setPanel(null); }} style={styles.homeListingOption}><Text style={[styles.homeListingOptionText, selectedOption === option && styles.homeListingOptionTextActive]}>{option}</Text><Ionicons name={selectedOption === option ? 'radio-button-on' : 'radio-button-off'} size={21} color={selectedOption === option ? palette.blue : palette.muted} /></Pressable>)}</Pressable></Pressable></Modal>
+  </View>;
+}
+
+const TOP_SEARCHES = ['Headphones', 'Smart Watches', 'Cameras', 'Laptops', 'Speakers', 'Mobile Cases'];
+
+function ProductDiscoverySearchPage({ products, favoriteIds, onBack, onSearch, onFavorite, onAdd, onOpen }: { products: Product[]; favoriteIds: Set<string>; onBack: () => void; onSearch: (query: string) => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
+  const [query, setQuery] = useState('');
+  const cardWidth = Math.max(150, (Math.min(Dimensions.get('window').width, 440) - 44) / 2);
+  const submit = (value = query) => {
+    const search = value.trim();
+    if (search) onSearch(search);
+  };
+  return <View style={styles.discoverySearchPage}>
+    <View style={styles.discoverySearchHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.discoverySearchBack}><Ionicons name="arrow-back" size={25} color={palette.heading} /></Pressable><TextInput autoFocus value={query} onChangeText={setQuery} onSubmitEditing={() => submit()} placeholder="Search products here" placeholderTextColor="#8A8F98" returnKeyType="search" style={styles.discoverySearchInput} /><Pressable onPress={() => submit()} hitSlop={8} style={styles.discoverySearchSubmit}><Ionicons name="search" size={22} color={palette.blue} /></Pressable></View>
+    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.discoverySearchContent}>
+      <Text style={styles.discoverySearchTitle}>Top Searches</Text>
+      <View style={styles.discoverySearchChips}>{TOP_SEARCHES.map(term => <Pressable key={term} onPress={() => submit(term)} style={({ pressed }) => [styles.discoverySearchChip, pressed && styles.pressed]}><Ionicons name="trending-up" size={17} color={palette.white} /><Text style={styles.discoverySearchChipText}>{term}</Text></Pressable>)}</View>
+      <Text style={[styles.discoverySearchTitle, styles.discoveryLovedTitle]}>People love these</Text>
+      <View style={styles.discoveryProductGrid}>{products.slice(0, 6).map(product => <ProductCard key={`discovery-${product.id}`} item={product} width={cardWidth} favorite={favoriteIds.has(product.id)} collectionLayout onFavorite={() => onFavorite(product)} onAdd={() => onAdd(product)} onOpen={() => onOpen(product)} />)}</View>
+    </ScrollView>
   </View>;
 }
 
@@ -607,7 +627,7 @@ function Storefront() {
   const [productReturnScreen, setProductReturnScreen] = useState<ReturnScreen>('home');
   const [cartReturnScreen, setCartReturnScreen] = useState<ReturnScreen>('home');
   const [categoryCollectionReturnScreen, setCategoryCollectionReturnScreen] = useState<'home' | 'categories' | 'offers'>('home');
-  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'homeProducts' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
+  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'discoverySearch' | 'homeProducts' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchPlaceholderIndex, setSearchPlaceholderIndex] = useState(0);
   const searchPlaceholderY = useRef(new Animated.Value(0)).current;
@@ -736,6 +756,7 @@ function Storefront() {
       if (screen === 'categoryCollection') { setScreen(categoryCollectionReturnScreen); return true; }
       if (screen === 'wishlist') { setScreen('home'); return true; }
       if (screen === 'search') { setScreen('home'); return true; }
+      if (screen === 'discoverySearch') { setScreen('homeProducts'); return true; }
       if (screen === 'homeProducts') { setScreen('home'); return true; }
       if (screen === 'offers') { setScreen('home'); return true; }
       if (screen === 'orders') { setScreen('home'); return true; }
@@ -862,9 +883,10 @@ function Storefront() {
     const setter = type === 'brand' ? setSearchBrands : setSearchVendors;
     setter(current => { const next = new Set(current); next.has(value) ? next.delete(value) : next.add(value); return next; });
   };
-  const submitSearch = () => {
-    const query = searchQuery.trim();
+  const runSearch = (searchTerm: string) => {
+    const query = searchTerm.trim();
     if (!query) return;
+    setSearchQuery(query);
     setSubmittedSearch(query);
     setScreen('search');
     setSearchLoading(true);
@@ -875,6 +897,7 @@ function Storefront() {
       setSearchCursor(page.endCursor);
     }).catch(error => setSearchError(error instanceof Error ? error.message : 'Search failed.')).finally(() => setSearchLoading(false));
   };
+  const submitSearch = () => runSearch(searchQuery);
 
   useEffect(() => {
     const query = searchQuery.trim();
@@ -1315,7 +1338,7 @@ function Storefront() {
 
   const openCart = () => {
     setCartPopupVisible(false);
-    setCartReturnScreen(screen === 'product' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'homeProducts' ? screen : 'home');
+    setCartReturnScreen(screen === 'product' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'discoverySearch' || screen === 'homeProducts' ? screen : 'home');
     setScreen('cart');
   };
 
@@ -1338,7 +1361,7 @@ function Storefront() {
   const openProduct = (product: Product, preferredCollectionId?: string) => {
     const recommendationRequest = ++productRecommendationRequestRef.current;
     setRecentlyViewed(current => [product, ...current.filter(item => item.id !== product.id)].slice(0, 10));
-    if (screen !== 'product') setProductReturnScreen(screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'homeProducts' || screen === 'cart' ? screen : 'home');
+    if (screen !== 'product') setProductReturnScreen(screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'discoverySearch' || screen === 'homeProducts' || screen === 'cart' ? screen : 'home');
     setSelectedProduct(product);
     setScreen('product');
     const collectionId = preferredCollectionId ?? product.collectionIds?.[0];
@@ -1508,8 +1531,10 @@ function Storefront() {
 
   if (screen === 'homeProducts') {
     const listingProducts = homeProductListing === 'trending' ? categoryProducts : bestSellingHomeProducts;
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><HomeProductListingPage title={homeProductListing === 'trending' ? 'Trending' : 'Best Selling'} products={listingProducts} favoriteIds={favorites} onBack={() => navigateBack('home')} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 76 }} /> : null}</Animated.View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><HomeProductListingPage title={homeProductListing === 'trending' ? 'Trending' : 'Best Selling'} products={listingProducts} favoriteIds={favorites} cartCount={cartCount} onBack={() => navigateBack('home')} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} onOpenSearch={() => setScreen('discoverySearch')} onOpenCart={openCart} onOpenWishlist={() => openFooterPage('wishlist')} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 76 }} /> : null}</Animated.View></SafeAreaView>;
   }
+
+  if (screen === 'discoverySearch') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDiscoverySearchPage products={bestSellingHomeProducts.length ? bestSellingHomeProducts : shopifyProducts} favoriteIds={favorites} onBack={() => navigateBack('homeProducts')} onSearch={runSearch} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 12 }} /> : null}</Animated.View></SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations;
@@ -1543,9 +1568,9 @@ function Storefront() {
     <View style={styles.searchResultsHeader}><Pressable onPress={() => navigateBack('home')} hitSlop={10}><Ionicons name="arrow-back" size={24} color="#FFFFFF" /></Pressable><View style={styles.searchResultsHeaderCopy}><Text style={styles.searchResultsHeaderTitle}>Search Results</Text><Text style={styles.searchResultsHeaderSubtitle}>Results for “{submittedSearch}”</Text></View><View style={{ width: 24 }} /></View>
     <ScrollView style={styles.searchResultsPage} contentContainerStyle={styles.searchResultsContent} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">
       <View style={styles.wishlistHeadingBlock}><Text style={styles.wishlistHeading}>Search Results</Text><Text style={styles.wishlistCount}>{displayedSearchResults.length} products</Text></View>
-      <View style={styles.searchControls}><Pressable onPress={() => setSearchFilterVisible(true)} style={[styles.searchControl, searchFilterCount > 0 && styles.searchControlActive]}><Ionicons name="options-outline" size={18} color={searchFilterCount ? '#FFFFFF' : palette.ink} /><Text numberOfLines={1} style={[styles.searchControlText, searchFilterCount > 0 && styles.searchControlTextActive]}>Filters{searchFilterCount ? ` (${searchFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={searchFilterCount ? '#FFFFFF' : palette.ink} /></Pressable><Pressable onPress={() => setSearchSort(current => current === 'Recommended' ? 'Price: Low' : current === 'Price: Low' ? 'Price: High' : current === 'Price: High' ? 'Name' : 'Recommended')} style={styles.searchControl}><Ionicons name="swap-vertical" size={18} color={palette.ink} /><Text numberOfLines={1} style={styles.searchControlText}>Sort: {searchSort}</Text><Ionicons name="chevron-down" size={15} color={palette.ink} /></Pressable></View>
       {searchLoading ? <View style={styles.wishlistEmpty}><RotatingSearchIcon size={34} /></View> : searchError ? <View style={styles.wishlistEmpty}><Ionicons name="cloud-offline-outline" size={52} color={palette.red} /><Text style={styles.wishlistEmptyTitle}>Search failed</Text><Text style={styles.wishlistEmptyCopy}>{searchError}</Text></View> : displayedSearchResults.length ? <View style={styles.searchResultList}>{displayedSearchResults.map(item => <Pressable key={`search-${item.id}`} onPress={() => openProduct(item)} style={styles.searchResultRow}><Image source={item.image} style={styles.searchResultImage} resizeMode="contain" /><View style={styles.searchResultCopy}><Text numberOfLines={2} style={styles.searchResultTitle}>{item.name}</Text><Text style={styles.searchResultPrice}>{item.price}</Text></View><Ionicons name="chevron-forward" size={20} color={palette.blue} /></Pressable>)}{searchHasNextPage ? <Pressable disabled={searchLoadingMore} onPress={loadMoreSearchResults} style={[styles.searchLoadMore, searchLoadingMore && styles.searchLoadMoreDisabled]}>{searchLoadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.searchLoadMoreText}>Load more</Text>}</Pressable> : null}</View> : <View style={styles.wishlistEmpty}><Ionicons name="search-outline" size={52} color={palette.blue} /><Text style={styles.wishlistEmptyTitle}>No matching products</Text><Text style={styles.wishlistEmptyCopy}>Try another stock filter or keyword.</Text></View>}
     </ScrollView>
+    <View style={styles.searchControls}><Pressable onPress={() => setSearchFilterVisible(true)} style={[styles.searchControl, searchFilterCount > 0 && styles.searchControlActive]}><Ionicons name="options-outline" size={18} color={searchFilterCount ? '#FFFFFF' : palette.ink} /><Text numberOfLines={1} style={[styles.searchControlText, searchFilterCount > 0 && styles.searchControlTextActive]}>Filters{searchFilterCount ? ` (${searchFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={searchFilterCount ? '#FFFFFF' : palette.ink} /></Pressable><Pressable onPress={() => setSearchSort(current => current === 'Recommended' ? 'Price: Low' : current === 'Price: Low' ? 'Price: High' : current === 'Price: High' ? 'Name' : 'Recommended')} style={styles.searchControl}><Ionicons name="swap-vertical" size={18} color={palette.ink} /><Text numberOfLines={1} style={styles.searchControlText}>Sort: {searchSort}</Text><Ionicons name="chevron-down" size={15} color={palette.ink} /></Pressable></View>
     <Modal visible={searchFilterVisible} transparent animationType="slide" onRequestClose={() => setSearchFilterVisible(false)}><Pressable style={styles.searchFilterBackdrop} onPress={() => setSearchFilterVisible(false)}><Pressable style={styles.searchFilterSheet} onPress={() => {}}><View style={styles.searchFilterHeader}><Text style={styles.searchFilterTitle}>Filters</Text><Pressable onPress={() => setSearchFilterVisible(false)}><Ionicons name="close" size={26} color={palette.heading} /></Pressable></View><View style={styles.searchFilterBody}><View style={styles.searchFilterPanel}><Text style={styles.searchFilterSection}>Brand</Text><ScrollView nestedScrollEnabled style={styles.searchFilterOptions} contentContainerStyle={styles.searchFilterOptionsContent} showsVerticalScrollIndicator>{searchBrandOptions.map(option => <Pressable key={`brand-${option}`} onPress={() => toggleSearchFilter(option, 'brand')} style={styles.searchFilterOption}><View style={[styles.searchCheckbox, searchBrands.has(option) && styles.searchCheckboxActive]}>{searchBrands.has(option) ? <Ionicons name="checkmark" size={15} color="#FFFFFF" /> : null}</View><Text style={styles.searchFilterOptionText}>{option}</Text></Pressable>)}{!searchBrandOptions.length ? <Text style={styles.searchFilterEmpty}>No brand information available.</Text> : null}</ScrollView></View><View style={styles.searchFilterDivider} /><View style={styles.searchFilterPanel}><Text style={styles.searchFilterSection}>Shipping (Vendor)</Text><ScrollView nestedScrollEnabled style={styles.searchFilterOptions} contentContainerStyle={styles.searchFilterOptionsContent} showsVerticalScrollIndicator>{searchVendorOptions.map(option => <Pressable key={`vendor-${option}`} onPress={() => toggleSearchFilter(option, 'vendor')} style={styles.searchFilterOption}><View style={[styles.searchCheckbox, searchVendors.has(option) && styles.searchCheckboxActive]}>{searchVendors.has(option) ? <Ionicons name="checkmark" size={15} color="#FFFFFF" /> : null}</View><Text style={styles.searchFilterOptionText}>{option}</Text></Pressable>)}{!searchVendorOptions.length ? <Text style={styles.searchFilterEmpty}>No shipping information available.</Text> : null}</ScrollView></View></View><View style={styles.searchFilterActions}><Pressable onPress={() => { setSearchBrands(new Set()); setSearchVendors(new Set()); }} style={styles.searchClearButton}><Text style={styles.searchClearText}>Clear all</Text></Pressable><Pressable onPress={() => setSearchFilterVisible(false)} style={styles.searchApplyButton}><Text style={styles.searchApplyText}>Show {displayedSearchResults.length} products</Text></Pressable></View></Pressable></Pressable></Modal>
     </Animated.View>
   </SafeAreaView>;
@@ -1976,7 +2001,7 @@ const styles = StyleSheet.create({
   searchResultsHeaderSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   searchResultsPage: { flex: 1, backgroundColor: '#FFFFFF' },
   searchResultsContent: { paddingBottom: 28 },
-  searchControls: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 10 },
+  searchControls: { minHeight: 64, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#DDE2E8', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 10 },
   searchControl: { flex: 1, height: 42, minWidth: 0, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: '#D5DBE3', borderRadius: 10, backgroundColor: '#FFFFFF' },
   searchControlActive: { borderColor: palette.blue, backgroundColor: palette.blue },
   searchControlText: { flexShrink: 1, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '800' },
@@ -2034,8 +2059,13 @@ const styles = StyleSheet.create({
   homeListingPage: { flex: 1, backgroundColor: palette.white },
   homeListingHeader: { height: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#0A254A' },
   homeListingBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  homeListingHeaderCopyBlock: { flex: 1, minWidth: 0 },
   homeListingHeaderTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
   homeListingHeaderCopy: { marginTop: 2, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '600' },
+  homeListingHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  homeListingHeaderAction: { position: 'relative', width: 36, height: 40, alignItems: 'center', justifyContent: 'center' },
+  homeListingBadge: { position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17, paddingHorizontal: 3, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.red },
+  homeListingBadgeText: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '900' },
   homeListingBody: { flex: 1, paddingTop: 16, backgroundColor: palette.white },
   homeListingProductScroll: { paddingHorizontal: 16, paddingBottom: 24 },
   homeListingProductGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
@@ -2052,6 +2082,18 @@ const styles = StyleSheet.create({
   homeListingOption: { minHeight: 54, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   homeListingOptionText: { color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '600' },
   homeListingOptionTextActive: { color: palette.blue, fontWeight: '900' },
+  discoverySearchPage: { flex: 1, backgroundColor: palette.white },
+  discoverySearchHeader: { minHeight: 74, marginHorizontal: 16, marginTop: 10, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#D9DDE3', backgroundColor: palette.white },
+  discoverySearchBack: { width: 46, height: 54, alignItems: 'center', justifyContent: 'center' },
+  discoverySearchInput: { flex: 1, height: 54, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '600' },
+  discoverySearchSubmit: { width: 44, height: 54, alignItems: 'center', justifyContent: 'center' },
+  discoverySearchContent: { paddingHorizontal: 16, paddingTop: 26, paddingBottom: 30 },
+  discoverySearchTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 22, lineHeight: 28, fontWeight: '900' },
+  discoverySearchChips: { marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  discoverySearchChip: { minHeight: 42, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 7, backgroundColor: '#0A254A' },
+  discoverySearchChipText: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '800' },
+  discoveryLovedTitle: { marginTop: 34, marginBottom: 16 },
+  discoveryProductGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
   homeProductSections: { paddingHorizontal: 16, paddingBottom: 8, backgroundColor: palette.white },
   homeSectionHeader: { minHeight: 62, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   homeSectionHeaderFull: { justifyContent: 'flex-start' },
