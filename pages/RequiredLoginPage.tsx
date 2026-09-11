@@ -2,15 +2,11 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export function RequiredLoginPage({ loading, error, onLogin, onClose }: { loading: boolean; error: string | null; onLogin: (identifier?: string, password?: string) => void; onClose: () => void }) {
+export function RequiredLoginPage({ loading, error, onLogin, onGoogleLogin, onClose }: { loading: boolean; error: string | null; onLogin: (identifier?: string, password?: string) => void; onGoogleLogin: () => void; onClose: () => void }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [whatsAppLogin, setWhatsAppLogin] = useState(false);
-  const [whatsAppNumber, setWhatsAppNumber] = useState('');
-  const [otpRequested, setOtpRequested] = useState(false);
-  const [otp, setOtp] = useState(['', '', '', '']);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gstNumber, setGstNumber] = useState('');
@@ -26,15 +22,7 @@ export function RequiredLoginPage({ loading, error, onLogin, onClose }: { loadin
     <Animated.View style={[s.transitionPage, { opacity: transition, transform: [{ translateY: transition.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }]}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close login" hitSlop={12} onPress={() => leaveLogin(onClose)} style={s.closeButton}><Ionicons name="close" size={30} color="#FFFFFF" /></Pressable>
     <View style={s.hero}><Image source={require('../images/blumaple-header-white.png')} style={s.logo} resizeMode="contain" /></View>
-    {whatsAppLogin ? <View style={s.card}>
-      <Text style={s.resetTitle}>SIGN IN WITH WHATSAPP</Text>
-      <Text style={s.resetSubtitle}>Enter your WhatsApp number and the 4-digit OTP</Text>
-      {error ? <Text style={s.error}>{error}</Text> : null}
-      <View style={s.whatsAppNumberRow}><View style={s.countryCode}><Text style={s.countryCodeText}>+91</Text></View><TextInput value={whatsAppNumber} onChangeText={value => { setWhatsAppNumber(value.replace(/\D/g, '').slice(0, 10)); setOtpRequested(false); }} keyboardType="number-pad" maxLength={10} placeholder="WhatsApp number" placeholderTextColor="#858D98" style={[s.input, s.whatsAppNumberInput]} /><Pressable disabled={whatsAppNumber.length !== 10} onPress={() => setOtpRequested(true)} style={[s.sendOtpButton, whatsAppNumber.length !== 10 && s.sendOtpDisabled]}><Text style={s.sendOtpText}>{otpRequested ? 'Sent' : 'Send OTP'}</Text></Pressable></View>
-      <View style={s.otpRow}>{otp.map((digit, index) => <TextInput key={index} value={digit} onChangeText={(value) => setOtp((current) => current.map((item, itemIndex) => itemIndex === index ? value.replace(/\D/g, '').slice(-1) : item))} keyboardType="number-pad" maxLength={1} textAlign="center" style={s.otpInput} />)}</View>
-      <Pressable disabled={loading} onPress={() => onLogin()} style={s.primary}>{loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.primaryText}>VERIFY OTP</Text>}</Pressable>
-      <Pressable onPress={() => changeView(() => setWhatsAppLogin(false))} style={s.cancel}><Text style={s.cancelText}>Back to sign in ›</Text></Pressable>
-    </View> : resetting ? <View style={s.card}>
+    {resetting ? <View style={s.card}>
       <Text style={s.resetTitle}>RESET YOUR PASSWORD</Text>
       <Text style={s.resetSubtitle}>We will send you an email to reset your password</Text>
       {error ? <Text style={s.error}>{error}</Text> : null}
@@ -53,15 +41,14 @@ export function RequiredLoginPage({ loading, error, onLogin, onClose }: { loadin
       <View style={s.loginRow}><Text style={s.accountText}>Already have an account? </Text><Pressable onPress={() => changeView(() => setCreating(false))}><Text style={s.createLoginLink}>Login ›</Text></Pressable></View>
     </View> : <View style={s.card}>
       <Text style={s.title}>LOGIN</Text>
-      <Text style={s.subtitle}>If you have an account with us, please log in.</Text>
+      <Text style={s.subtitle}>Use the same email and password as your Blumaple website account.</Text>
       {error ? <Text style={s.error}>{error}</Text> : null}
       <TextInput value={identifier} onChangeText={setIdentifier} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder="Email address" placeholderTextColor="#858D98" style={s.input} />
       <TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="Password" placeholderTextColor="#858D98" style={s.input} />
-      <Pressable disabled={loading} onPress={() => identifier.trim().toLowerCase() === 'admin@app.com' && password === '12345' ? leaveLogin(() => onLogin(identifier, password)) : onLogin(identifier, password)} style={s.primary}>{loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.primaryText}>SIGN IN</Text>}</Pressable>
+      <Pressable disabled={loading} onPress={() => leaveLogin(() => onLogin(identifier, password))} style={s.primary}>{loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.primaryText}>SIGN IN</Text>}</Pressable>
       <View style={s.accountRow}><Text style={s.accountText}>Don't have an account? </Text><Pressable onPress={() => changeView(() => setCreating(true))}><Text style={s.linkText}>Create an account ›</Text></Pressable></View>
       <Pressable onPress={() => changeView(() => setResetting(true))} style={s.forgot}><Text style={s.linkText}>Forgot your password? ›</Text></Pressable>
-      <Pressable onPress={() => changeView(() => setWhatsAppLogin(true))} style={s.whatsApp}><Ionicons name="logo-whatsapp" size={20} color="#FFFFFF" /><Text style={s.whatsAppText}>Sign in with WhatsApp OTP</Text></Pressable>
-      <Pressable disabled={loading} onPress={() => changeView(() => onLogin())} style={s.google}><View style={s.googleIcon}><Ionicons name="logo-google" size={20} color="#DB4437" /></View><Text style={s.googleText}>Sign in with Google</Text></Pressable>
+      <Pressable disabled={loading} onPress={() => changeView(onGoogleLogin)} style={s.google}><View style={s.googleIcon}><Ionicons name="logo-google" size={20} color="#DB4437" /></View><Text style={s.googleText}>Sign in with Google</Text></Pressable>
     </View>}
     </Animated.View>
   </KeyboardAvoidingView>;

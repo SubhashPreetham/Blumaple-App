@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { ShopifyCustomer } from '../src/shopifyCustomerAuth';
-import { savedAddresses } from './AddressPage';
 
 type Section = 'personal' | 'addresses' | 'billing' | 'about' | 'policies' | 'faq' | 'notifications';
 
@@ -256,12 +256,28 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
   const [aboutOpen, setAboutOpen] = useState(true);
   const [openPolicies, setOpenPolicies] = useState<Set<string>>(new Set());
   const [openFaqs, setOpenFaqs] = useState<Set<string>>(new Set());
-  const [profileAddresses, setProfileAddresses] = useState<ProfileAddress[]>(savedAddresses.map(address => ({ ...address, lastName: '', email: '' })));
+  const [profileAddresses, setProfileAddresses] = useState<ProfileAddress[]>([]);
   const [billingAddresses, setBillingAddresses] = useState<ProfileAddress[]>([]);
+  const [addressStorageReady, setAddressStorageReady] = useState(false);
   const [addressModal, setAddressModal] = useState<'saved' | 'billing' | null>(null);
   const [addressForm, setAddressForm] = useState<ProfileAddress>(emptyAddress);
   const [notifications, setNotifications] = useState({ orders: true, offers: true, arrivals: false, whatsapp: true });
   const loggedIn = Boolean(customer);
+  useEffect(() => {
+    if (!customer) return;
+    setAddressStorageReady(false);
+    const shopifyAddresses = (customer.addresses?.nodes || []).map((address, index) => ({ label: index === 0 ? 'Default' : `Address ${index + 1}`, name: address.firstName || customer.firstName || '', lastName: address.lastName || customer.lastName || '', email: customer.emailAddress?.emailAddress || '', phone: (address.phoneNumber || customer.phoneNumber?.phoneNumber || '').replace(/\D/g, '').slice(-10), company: address.company || '', building: address.address1 || '', line: address.address2 || '', city: address.city || '', state: address.zoneCode || '', pincode: address.zip || '' }));
+    const storageKey = `blumaple.profile.addresses.${customer.id.replace(/[^A-Za-z0-9._-]/g, '_')}`;
+    SecureStore.getItemAsync(storageKey).catch(() => null).then(value => {
+      if (!value) { setProfileAddresses(shopifyAddresses); return; }
+      try { const stored = JSON.parse(value) as { saved?: ProfileAddress[]; billing?: ProfileAddress[] }; setProfileAddresses(stored.saved?.length ? stored.saved : shopifyAddresses); setBillingAddresses(stored.billing || []); } catch { setProfileAddresses(shopifyAddresses); }
+    }).finally(() => setAddressStorageReady(true));
+  }, [customer]);
+  useEffect(() => {
+    if (!customer || !addressStorageReady) return;
+    const safeCustomerId = customer.id.replace(/[^A-Za-z0-9._-]/g, '_');
+    void SecureStore.setItemAsync(`blumaple.profile.addresses.${safeCustomerId}`, JSON.stringify({ saved: profileAddresses, billing: billingAddresses })).catch(() => {});
+  }, [addressStorageReady, billingAddresses, customer, profileAddresses]);
   const toggle = (key: keyof typeof notifications) => setNotifications(current => ({ ...current, [key]: !current[key] }));
   const setAddressValue = (key: keyof ProfileAddress, value: string) => setAddressForm(current => ({ ...current, [key]: value }));
   const openAddressModal = (kind: 'saved' | 'billing') => { setAddressForm({ ...emptyAddress }); setAddressModal(kind); };
@@ -297,9 +313,9 @@ export function ProfilePage({ customer, onLogout }: { customer: ShopifyCustomer 
       <ScrollView style={s.content} contentContainerStyle={s.contentContainer} showsVerticalScrollIndicator={false} nestedScrollEnabled bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">
         {section === 'personal' ? <>
           <Text style={s.sectionTitle}>Personal details</Text>
-          <Detail label="Name" value={customer?.displayName || 'Admin'} />
-          <Detail label="Phone" value="+91 98765 43210" />
-          <Detail label="Email" value={customer?.emailAddress?.emailAddress || 'admin@app.com'} />
+          <Detail label="Name" value={customer?.displayName || 'Not available'} />
+          <Detail label="Phone" value={customer?.phoneNumber?.phoneNumber || 'Not added'} />
+          <Detail label="Email" value={customer?.emailAddress?.emailAddress || 'Not available'} />
           <Pressable style={s.primaryButton}><Text style={s.primaryButtonText}>Reset password</Text></Pressable>
         </> : null}
 

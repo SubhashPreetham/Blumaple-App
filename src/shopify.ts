@@ -59,7 +59,7 @@ type CollectionProductsResponse = {
 };
 
 type CollectionProductCountResponse = {
-  data?: { node: ({ products: { nodes: Array<{ id: string }>; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }) | null };
+  data?: { node: ({ products: { nodes: Array<{ id: string; vendor: string; brandName: { value: string } | null }>; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }) | null };
   errors?: Array<{ message: string }>;
 };
 
@@ -68,6 +68,12 @@ export type ShopifyProductPage = {
   hasNextPage: boolean;
   endCursor: string | null;
 };
+
+export type ShopifyCollectionFilters = { brands: string[]; vendors: string[]; total: number };
+export type ShopifyProductFilter = { productVendor?: string; productMetafield?: { namespace: string; key: string; value: string } };
+
+export type ShopifyCartLineInput = { merchandiseId: string; quantity: number };
+export type ShopifyDeliveryInput = { firstName: string; lastName?: string; company?: string; address1: string; address2?: string; city: string; province?: string; countryCode: string; zip: string; phone?: string };
 
 const PRODUCTS_QUERY = `#graphql
   query MobileProducts($first: Int!, $after: String) {
@@ -150,11 +156,11 @@ const COLLECTION_PREVIEWS_QUERY = `#graphql
 `;
 
 const COLLECTION_PRODUCTS_QUERY = `#graphql
-  query MobileCollectionProducts($id: ID!, $first: Int!, $after: String) {
+  query MobileCollectionProducts($id: ID!, $first: Int!, $after: String, $filters: [ProductFilter!]) {
     node(id: $id) {
       ... on Collection {
         id title
-        products(first: $first, after: $after) {
+        products(first: $first, after: $after, filters: $filters) {
           pageInfo { hasNextPage endCursor }
           nodes {
             id handle title vendor tags description
@@ -177,7 +183,7 @@ const COLLECTION_PRODUCT_COUNT_QUERY = `#graphql
     node(id: $id) {
       ... on Collection {
         products(first: 250, after: $after) {
-          nodes { id }
+          nodes { id vendor brandName: metafield(namespace: "custom", key: "brand_name") { value } }
           pageInfo { hasNextPage endCursor }
         }
       }
@@ -187,6 +193,38 @@ const COLLECTION_PRODUCT_COUNT_QUERY = `#graphql
 
 function normalizeDomain(value: string) {
   return value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
+export async function createShopifyCartCheckout(lines: ShopifyCartLineInput[], address: ShopifyDeliveryInput, email?: string, customerAccessToken?: string, discountCode?: string) {
+  const domain = process.env.EXPO_PUBLIC_SHOPIFY_STORE_DOMAIN?.trim();
+  const token = process.env.EXPO_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN?.trim();
+  if (!domain || !token) throw new Error('Shopify checkout is not configured.');
+  if (!lines.length || lines.some(line => !line.merchandiseId)) throw new Error('One or more products cannot be checked out. Please refresh the catalog and try again.');
+  const query = `#graphql
+    mutation MobileCartCreate($input: CartInput!) {
+      cartCreate(input: $input) {
+        cart { id checkoutUrl }
+        userErrors { field message }
+      }
+    }
+  `;
+  // CartBuyerIdentity uses an ISO countryCode, but its nested MailingAddressInput
+  // uses the field name `country`. Sending countryCode inside deliveryAddress is
+  // rejected by Shopify before either online or COD checkout can begin.
+  const { countryCode, ...mailingAddress } = address;
+  const buyerIdentity: Record<string, unknown> = {
+    countryCode,
+    deliveryAddressPreferences: [{ deliveryAddress: { ...mailingAddress, country: countryCode === 'IN' ? 'India' : countryCode } }],
+  };
+  if (email) buyerIdentity.email = email;
+  if (customerAccessToken) buyerIdentity.customerAccessToken = customerAccessToken;
+  const input: Record<string, unknown> = { lines, buyerIdentity };
+  if (discountCode?.trim()) input.discountCodes = [discountCode.trim().toUpperCase()];
+  const response = await fetch(`https://${normalizeDomain(domain)}/api/2026-01/graphql.json`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Storefront-Access-Token': token }, body: JSON.stringify({ query, variables: { input } }) });
+  const payload = await response.json() as { data?: { cartCreate?: { cart?: { id: string; checkoutUrl: string } | null; userErrors?: Array<{ message: string }> } }; errors?: Array<{ message: string }> };
+  const errors = [...(payload.errors || []), ...(payload.data?.cartCreate?.userErrors || [])];
+  if (!response.ok || errors.length || !payload.data?.cartCreate?.cart?.checkoutUrl) throw new Error(errors.map(item => item.message).join('\n') || `Unable to create checkout (${response.status}).`);
+  return payload.data.cartCreate.cart;
 }
 
 export async function fetchShopifyProducts(first = 20): Promise<ShopifyProduct[]> {
@@ -279,7 +317,7 @@ export async function fetchShopifyCollectionPreviews(ids: string[]): Promise<Sho
   return (payload.data?.nodes ?? []).filter((node): node is ShopifyCollectionPreview => Boolean(node));
 }
 
-export async function fetchShopifyCollectionProducts(id: string, first = 30, after: string | null = null): Promise<ShopifyProductPage> {
+export async function fetchShopifyCollectionProducts(id: string, first = 30, after: string | null = null, filters: ShopifyProductFilter[] = []): Promise<ShopifyProductPage> {
   const rawDomain = process.env.EXPO_PUBLIC_SHOPIFY_STORE_DOMAIN;
   const token = process.env.EXPO_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN;
   if (!rawDomain || !token) throw new Error('Shopify environment variables are missing.');
@@ -290,7 +328,7 @@ export async function fetchShopifyCollectionProducts(id: string, first = 30, aft
       'Content-Type': 'application/json',
       'X-Shopify-Storefront-Access-Token': token.trim(),
     },
-    body: JSON.stringify({ query: COLLECTION_PRODUCTS_QUERY, variables: { id, first, after } }),
+    body: JSON.stringify({ query: COLLECTION_PRODUCTS_QUERY, variables: { id, first, after, filters } }),
   });
   const payload = (await response.json()) as CollectionProductsResponse;
   if (!response.ok) throw new Error(`Shopify collection products request failed (${response.status}).`);
@@ -331,4 +369,39 @@ export async function fetchShopifyCollectionProductCount(id: string): Promise<nu
     if (hasNextPage && !after) break;
   }
   return total;
+}
+
+export async function fetchShopifyCollectionFilters(id: string): Promise<ShopifyCollectionFilters> {
+  const rawDomain = process.env.EXPO_PUBLIC_SHOPIFY_STORE_DOMAIN;
+  const token = process.env.EXPO_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN;
+  if (!rawDomain || !token) throw new Error('Shopify environment variables are missing.');
+
+  const brands = new Set<string>();
+  const vendors = new Set<string>();
+  let total = 0;
+  let after: string | null = null;
+  let hasNextPage = true;
+  while (hasNextPage) {
+    const response = await fetch(`https://${normalizeDomain(rawDomain)}/api/2026-07/graphql.json`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shopify-Storefront-Access-Token': token.trim() },
+      body: JSON.stringify({ query: COLLECTION_PRODUCT_COUNT_QUERY, variables: { id, after } }),
+    });
+    const payload = (await response.json()) as CollectionProductCountResponse;
+    if (!response.ok) throw new Error(`Shopify collection filters request failed (${response.status}).`);
+    if (payload.errors?.length) throw new Error(payload.errors.map(error => error.message).join('\n'));
+    const connection = payload.data?.node?.products;
+    if (!connection) break;
+    total += connection.nodes.length;
+    connection.nodes.forEach(product => {
+      const brand = product.brandName?.value.trim();
+      const vendor = product.vendor.trim();
+      if (brand) brands.add(brand);
+      if (vendor) vendors.add(vendor);
+    });
+    hasNextPage = connection.pageInfo.hasNextPage;
+    after = connection.pageInfo.endCursor;
+    if (hasNextPage && !after) break;
+  }
+  return { brands: [...brands].sort(), vendors: [...vendors].sort(), total };
 }
