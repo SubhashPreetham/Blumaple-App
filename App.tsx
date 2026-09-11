@@ -282,7 +282,7 @@ function SectionTitle({ children }: React.PropsWithChildren) {
 }
 
 function HomeSectionHeader({ title, action = 'View all', showAction = true }: { title: string; action?: string; showAction?: boolean }) {
-  return <View style={styles.homeSectionHeader}><Text style={styles.homeSectionTitle}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
+  return <View style={[styles.homeSectionHeader, !showAction && styles.homeSectionHeaderFull]}><Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={styles.homeSectionTitle}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
 }
 
 function HomeProductListingPage({ title, products, favoriteIds, onBack, onFavorite, onAdd, onOpen }: { title: string; products: Product[]; favoriteIds: Set<string>; onBack: () => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
@@ -1624,7 +1624,7 @@ function Storefront() {
           <Animated.View style={[styles.homeProductSections, { opacity: homeCategoryEntrance, transform: [{ translateY: homeCategoryTranslateY }] }]}>
           <HomeSectionHeader title="Shop by Category" showAction={false} />
           <View style={styles.shopCategoryGrid}>
-            {shopCategories.map(({ id, label, image, collection, group }, index) => <Pressable key={id} style={[styles.shopCategoryItem, index % 2 === 1 && styles.shopCategoryItemMirrored]} onPress={() => {
+            {shopCategories.map(({ id, label, image, collection, group }, index) => <Pressable key={id} style={[styles.shopCategoryItem, index % 3 !== 2 && styles.shopCategoryItemSpacing, index % 2 === 1 && styles.shopCategoryItemMirrored]} onPress={() => {
               if (collection && group) {
                 openCategoryCollection(group, collection, 'home');
               }
@@ -1708,7 +1708,7 @@ function Storefront() {
           /> : null}
         </Animated.ScrollView>
         {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><RotatingSearchIcon /></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
-        <Animated.View style={[styles.floatingFooter, collapseBrowseChrome && { opacity: homeFooterOpacity, transform: [{ translateY: homeFooterTranslateY }] }]}> 
+        <Animated.View style={styles.floatingFooter}>
           <Pressable onPress={() => openFooterPage('home')} style={[styles.footerTab, activeFooterTab === 'home' && styles.footerTabSelected]}>
             <Ionicons name={activeFooterTab === 'home' ? 'home' : 'home-outline'} size={25} color={activeFooterTab === 'home' ? palette.blue : palette.muted} />
             <Text style={[styles.footerTabText, activeFooterTab === 'home' && styles.footerTabActive]}>Home</Text>
@@ -1872,7 +1872,7 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', right: -7, top: -7, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: palette.blue, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '700' },
   content: { paddingHorizontal: 0, paddingBottom: 72 },
-  browseContent: { paddingBottom: 10 },
+  browseContent: { paddingBottom: 78, backgroundColor: palette.white },
   carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, paddingBottom: 8, backgroundColor: homeChrome },
   carouselFade: { minHeight: 229, marginTop: 12, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
   carouselLoading: { height: 218, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12345B' },
@@ -1980,11 +1980,13 @@ const styles = StyleSheet.create({
   homeListingOptionTextActive: { color: palette.blue, fontWeight: '900' },
   homeProductSections: { paddingHorizontal: 16, paddingBottom: 8, backgroundColor: palette.white },
   homeSectionHeader: { minHeight: 62, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.25 },
+  homeSectionHeaderFull: { justifyContent: 'flex-start' },
+  homeSectionTitle: { flexShrink: 0, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.25 },
   homeSectionAction: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   homeSectionActionText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
-  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13 },
+  shopCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', rowGap: 13 },
   shopCategoryItem: { position: 'relative', width: '31.4%', height: 138, paddingHorizontal: 7, paddingTop: 12, paddingBottom: 9, overflow: 'hidden', borderWidth: 1, borderColor: '#E8EDF4', borderTopLeftRadius: 28, borderTopRightRadius: 14, borderBottomLeftRadius: 14, borderBottomRightRadius: 28, alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 8, elevation: 3 },
+  shopCategoryItemSpacing: { marginRight: '2.9%' },
   shopCategoryItemMirrored: { borderTopLeftRadius: 14, borderTopRightRadius: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 14 },
   shopCategoryBorderCap: { position: 'absolute', left: 15, right: 15, top: 0, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: '#0A254A' },
   shopCategoryBorderCapBlue: { backgroundColor: palette.blue },
