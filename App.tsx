@@ -93,7 +93,7 @@ type Product = {
 type CartItem = { product: Product; quantity: number };
 type HistoryOrder = { id: string; date: string; products: Product[]; amount: string; status: 'Delivered' | 'Shipped' | 'Processing' | 'Cancelled' | 'Returned'; deliveredAt?: string; shippingAddress: string };
 type OrderOutcome = { success: boolean; orderId?: string; items: CartItem[]; paymentMethod: 'online' | 'cod'; total: number; tax: number; codFee: number };
-type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'product' | 'cart';
+type ReturnScreen = 'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'search' | 'homeProducts' | 'product' | 'cart';
 
 type UploadedCarouselSlide = { id: string; image: string; title: string; collection: string };
 type UploadedCarouselData = Record<string, UploadedCarouselSlide[]>;
@@ -283,6 +283,31 @@ function SectionTitle({ children }: React.PropsWithChildren) {
 
 function HomeSectionHeader({ title, action = 'View all', showAction = true }: { title: string; action?: string; showAction?: boolean }) {
   return <View style={styles.homeSectionHeader}><Text style={styles.homeSectionTitle}>{title}</Text>{showAction ? <View style={styles.homeSectionAction}><Text style={styles.homeSectionActionText}>{action}</Text><Ionicons name="chevron-forward" size={14} color={palette.blue} /></View> : null}</View>;
+}
+
+function HomeProductListingPage({ title, products, favoriteIds, onBack, onFavorite, onAdd, onOpen }: { title: string; products: Product[]; favoriteIds: Set<string>; onBack: () => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
+  const [sort, setSort] = useState<'Recommended' | 'Price: Low' | 'Price: High' | 'Name'>('Recommended');
+  const [filter, setFilter] = useState<'All' | 'In stock' | 'On offer'>('All');
+  const [panel, setPanel] = useState<'sort' | 'filter' | null>(null);
+  const cardWidth = Math.max(150, (Math.min(Dimensions.get('window').width, 440) - 44) / 2);
+  const visibleProducts = useMemo(() => {
+    const result = products.filter(product => filter === 'All' || (filter === 'In stock' ? product.availableForSale !== false : Boolean(product.oldPrice)));
+    if (sort === 'Price: Low') result.sort((a, b) => (a.unitPrice ?? 0) - (b.unitPrice ?? 0));
+    if (sort === 'Price: High') result.sort((a, b) => (b.unitPrice ?? 0) - (a.unitPrice ?? 0));
+    if (sort === 'Name') result.sort((a, b) => a.name.localeCompare(b.name));
+    return result;
+  }, [filter, products, sort]);
+  const options = panel === 'sort' ? ['Recommended', 'Price: Low', 'Price: High', 'Name'] as const : ['All', 'In stock', 'On offer'] as const;
+  const selectedOption = panel === 'sort' ? sort : filter;
+
+  return <View style={styles.homeListingPage}>
+    <View style={styles.homeListingHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.homeListingBack}><Ionicons name="arrow-back" size={24} color={palette.white} /></Pressable><View><Text style={styles.homeListingHeaderTitle}>{title}</Text><Text style={styles.homeListingHeaderCopy}>{visibleProducts.length} products</Text></View></View>
+    <View style={styles.homeListingBody}>
+      {visibleProducts.length ? <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.homeListingProductScroll}><View style={styles.homeListingProductGrid}>{visibleProducts.map(product => <ProductCard key={`${title}-${product.id}`} item={product} width={cardWidth} favorite={favoriteIds.has(product.id)} collectionLayout onFavorite={() => onFavorite(product)} onAdd={() => onAdd(product)} onOpen={() => onOpen(product)} />)}</View></ScrollView> : <View style={styles.homeListingEmpty}><Ionicons name="cube-outline" size={45} color={palette.blue} /><Text style={styles.homeListingEmptyText}>No products match this filter.</Text></View>}
+    </View>
+    <View style={styles.homeListingBottomBar}><Pressable onPress={() => setPanel('filter')} style={styles.homeListingControl}><Ionicons name="options-outline" size={20} color={palette.heading} /><Text style={styles.homeListingControlText}>Filters{filter !== 'All' ? ` · ${filter}` : ''}</Text></Pressable><View style={styles.homeListingControlDivider} /><Pressable onPress={() => setPanel('sort')} style={styles.homeListingControl}><Ionicons name="swap-vertical" size={20} color={palette.heading} /><Text style={styles.homeListingControlText}>Sort{sort !== 'Recommended' ? ` · ${sort}` : ''}</Text></Pressable></View>
+    <Modal visible={panel !== null} transparent animationType="slide" onRequestClose={() => setPanel(null)}><Pressable style={styles.homeListingModalBackdrop} onPress={() => setPanel(null)}><Pressable style={styles.homeListingSheet} onPress={() => {}}><View style={styles.homeListingSheetHeader}><Text style={styles.homeListingSheetTitle}>{panel === 'sort' ? 'Sort products' : 'Filter products'}</Text><Pressable onPress={() => setPanel(null)}><Ionicons name="close" size={25} color={palette.heading} /></Pressable></View>{options.map(option => <Pressable key={option} onPress={() => { if (panel === 'sort') setSort(option as typeof sort); else setFilter(option as typeof filter); setPanel(null); }} style={styles.homeListingOption}><Text style={[styles.homeListingOptionText, selectedOption === option && styles.homeListingOptionTextActive]}>{option}</Text><Ionicons name={selectedOption === option ? 'radio-button-on' : 'radio-button-off'} size={21} color={selectedOption === option ? palette.blue : palette.muted} /></Pressable>)}</Pressable></Pressable></Modal>
+  </View>;
 }
 
 function CarouselProgressIndicators({ count, activeIndex, fill }: { count: number; activeIndex: number; fill: Animated.Value }) {
@@ -571,6 +596,7 @@ function Storefront() {
   const [activeBanner, setActiveBanner] = useState(0);
   const [carouselCycle, setCarouselCycle] = useState(0);
   const [activeCategory, setActiveCategory] = useState('Audio');
+  const [homeProductListing, setHomeProductListing] = useState<'trending' | 'bestSelling'>('trending');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteProducts, setFavoriteProducts] = useState<Record<string, Product>>({});
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -579,7 +605,7 @@ function Storefront() {
   const [productReturnScreen, setProductReturnScreen] = useState<ReturnScreen>('home');
   const [cartReturnScreen, setCartReturnScreen] = useState<ReturnScreen>('home');
   const [categoryCollectionReturnScreen, setCategoryCollectionReturnScreen] = useState<'home' | 'categories' | 'offers'>('home');
-  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
+  const [screen, setScreen] = useState<'home' | 'categories' | 'categoryCollection' | 'wishlist' | 'offers' | 'orders' | 'profile' | 'search' | 'homeProducts' | 'product' | 'cart' | 'checkout' | 'address' | 'orderSuccess' | 'orderFailure'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchPlaceholderIndex, setSearchPlaceholderIndex] = useState(0);
   const searchPlaceholderY = useRef(new Animated.Value(0)).current;
@@ -675,6 +701,7 @@ function Storefront() {
       if (screen === 'categoryCollection') { setScreen(categoryCollectionReturnScreen); return true; }
       if (screen === 'wishlist') { setScreen('home'); return true; }
       if (screen === 'search') { setScreen('home'); return true; }
+      if (screen === 'homeProducts') { setScreen('home'); return true; }
       if (screen === 'offers') { setScreen('home'); return true; }
       if (screen === 'orders') { setScreen('home'); return true; }
       if (screen === 'profile') { setScreen('home'); return true; }
@@ -911,6 +938,10 @@ function Storefront() {
     },
     [activeShopifyMenu, catalog, categoryIndex, shopifyCollectionPreviews],
   );
+  const bestSellingHomeProducts = useMemo(() => [...categoryProducts].sort((a, b) => {
+    const discountDifference = Number(b.discount.replace(/[^0-9]/g, '')) - Number(a.discount.replace(/[^0-9]/g, ''));
+    return discountDifference || (b.unitPrice ?? 0) - (a.unitPrice ?? 0);
+  }), [categoryProducts]);
   const browserCarouselApiUrl = typeof window !== 'undefined' && window.location ? `${window.location.protocol}//${window.location.hostname}:3001/api/carousels` : '';
   const carouselApiUrl = process.env.EXPO_PUBLIC_CAROUSEL_API_URL ?? browserCarouselApiUrl;
   const uploadedSlides = uploadedCarousels[activeHomeMenu.label]?.filter(slide => slide.image) ?? [];
@@ -1228,7 +1259,7 @@ function Storefront() {
 
   const openCart = () => {
     setCartPopupVisible(false);
-    setCartReturnScreen(screen === 'product' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' ? screen : 'home');
+    setCartReturnScreen(screen === 'product' || screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'homeProducts' ? screen : 'home');
     setScreen('cart');
   };
 
@@ -1251,7 +1282,7 @@ function Storefront() {
   const openProduct = (product: Product, preferredCollectionId?: string) => {
     const recommendationRequest = ++productRecommendationRequestRef.current;
     setRecentlyViewed(current => [product, ...current.filter(item => item.id !== product.id)].slice(0, 10));
-    if (screen !== 'product') setProductReturnScreen(screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'cart' ? screen : 'home');
+    if (screen !== 'product') setProductReturnScreen(screen === 'categoryCollection' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'search' || screen === 'homeProducts' || screen === 'cart' ? screen : 'home');
     setSelectedProduct(product);
     setScreen('product');
     const collectionId = preferredCollectionId ?? product.collectionIds?.[0];
@@ -1406,6 +1437,11 @@ function Storefront() {
     {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={[styles.collectionCartPopupLayer, { paddingBottom: floatingCartBottom }]} /> : null}
     </Animated.View>
   </SafeAreaView>;
+
+  if (screen === 'homeProducts') {
+    const listingProducts = homeProductListing === 'trending' ? categoryProducts : bestSellingHomeProducts;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><HomeProductListingPage title={homeProductListing === 'trending' ? 'Trending' : 'Best Selling'} products={listingProducts} favoriteIds={favorites} onBack={() => navigateBack('home')} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 76 }} /> : null}</Animated.View></SafeAreaView>;
+  }
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations;
@@ -1603,14 +1639,16 @@ function Storefront() {
           <Animated.View style={[styles.homeProductSections, { opacity: homeTrendingEntrance, transform: [{ translateY: homeTrendingTranslateY }] }]}>
           <HomeSectionHeader title="Trending" showAction={false} />
           <View style={styles.homeProductGrid}>
-            {categoryProducts.map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
+            {categoryProducts.slice(0, 2).map(item => <ProductCard key={`explore-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </View>
+          {categoryProducts.length > 2 ? <Pressable onPress={() => { setHomeProductListing('trending'); setScreen('homeProducts'); }} style={({ pressed }) => [styles.homeViewAllButton, pressed && styles.pressed]}><Text style={styles.homeViewAllText}>View All</Text><Ionicons name="arrow-forward" size={20} color={palette.heading} /></Pressable> : null}
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeBestSellingEntrance, transform: [{ translateY: homeBestSellingTranslateY }] }]}>
           <HomeSectionHeader title="Best Selling" showAction={false} />
           <View style={styles.homeProductGrid}>
-            {categoryProducts.map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
+            {bestSellingHomeProducts.slice(0, 2).map(item => <ProductCard key={`grid-${activeHomeMenu.label}-${item.id}`} item={item} width={trendingCardWidth} favorite={favorites.has(item.id)} collectionLayout onFavorite={() => toggleFavorite(item)} onAdd={() => addToCart(item)} onOpen={() => openProduct(item)} />)}
           </View>
+          {bestSellingHomeProducts.length > 2 ? <Pressable onPress={() => { setHomeProductListing('bestSelling'); setScreen('homeProducts'); }} style={({ pressed }) => [styles.homeViewAllButton, pressed && styles.pressed]}><Text style={styles.homeViewAllText}>View All</Text><Ionicons name="arrow-forward" size={20} color={palette.heading} /></Pressable> : null}
           </Animated.View>
 
           </> : screen === 'orders' ? <View style={styles.ordersPage}>
@@ -1917,6 +1955,29 @@ const styles = StyleSheet.create({
   blinkDividerText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 2, fontWeight: '800' },
   exploreRow: { gap: 10, paddingBottom: 10 },
   homeProductGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18, paddingBottom: 12 },
+  homeViewAllButton: { height: 48, marginTop: 4, marginBottom: 10, borderWidth: 1.25, borderColor: palette.heading, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: palette.white },
+  homeViewAllText: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '700' },
+  homeListingPage: { flex: 1, backgroundColor: palette.white },
+  homeListingHeader: { height: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#0A254A' },
+  homeListingBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  homeListingHeaderTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
+  homeListingHeaderCopy: { marginTop: 2, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '600' },
+  homeListingBody: { flex: 1, paddingTop: 16, backgroundColor: palette.white },
+  homeListingProductScroll: { paddingHorizontal: 16, paddingBottom: 24 },
+  homeListingProductGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
+  homeListingEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  homeListingEmptyText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '600' },
+  homeListingBottomBar: { minHeight: 64, paddingHorizontal: 10, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#E1E4E8', backgroundColor: palette.white, shadowColor: '#000000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 10 },
+  homeListingControl: { flex: 1, minHeight: 50, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  homeListingControlText: { flexShrink: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  homeListingControlDivider: { width: 1, height: 30, backgroundColor: '#D9DDE2' },
+  homeListingModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  homeListingSheet: { paddingBottom: 24, borderTopLeftRadius: 22, borderTopRightRadius: 22, backgroundColor: palette.white },
+  homeListingSheetHeader: { height: 64, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#ECEEF1' },
+  homeListingSheetTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, fontWeight: '900' },
+  homeListingOption: { minHeight: 54, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  homeListingOptionText: { color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '600' },
+  homeListingOptionTextActive: { color: palette.blue, fontWeight: '900' },
   homeProductSections: { paddingHorizontal: 16, paddingBottom: 8, backgroundColor: palette.white },
   homeSectionHeader: { minHeight: 62, paddingTop: 18, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   homeSectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.25 },
