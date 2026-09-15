@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from '../src/shopify';
+import { useNotificationToast } from '../src/NotificationToast';
 
 type Props = {
   category: ShopifyMenuItem;
@@ -16,6 +17,10 @@ type Props = {
   loadingMore: boolean;
   hasNextPage: boolean;
   favoriteIds: Set<string>;
+  cartCount: number;
+  onOpenSearch: () => void;
+  onOpenWishlist: () => void;
+  onOpenCart: () => void;
   onBack: () => void;
   onSelectCollection: (collection: ShopifyMenuItem) => void;
   onLoadMore: () => void;
@@ -51,38 +56,18 @@ function CollectionCartonLoader() {
   return <View style={s.collectionLoader} accessibilityLabel="Loading products"><View style={{ width: 46, height: 46 }}><Animated.View style={{ position: 'absolute', opacity: closed }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View><Animated.View style={{ position: 'absolute', opacity: open, transform: [{ translateY: lift }] }}><MaterialCommunityIcons name="package-variant" size={46} color="#B97435" /></Animated.View></View></View>;
 }
 
-export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onToggleFavorite, onOpenProduct }: Props) {
+export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, cartCount, onOpenSearch, onOpenWishlist, onOpenCart, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onToggleFavorite, onOpenProduct }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('Recommended');
+  const toast = useNotificationToast();
   const [filterVisible, setFilterVisible] = useState(false);
   const [sortVisible, setSortVisible] = useState(false);
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [selectedShipping, setSelectedShipping] = useState<Set<string>>(new Set());
   const [appliedBrands, setAppliedBrands] = useState<Set<string>>(new Set());
   const [appliedShipping, setAppliedShipping] = useState<Set<string>>(new Set());
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [notifiedIds, setNotifiedIds] = useState<Set<string>>(new Set());
   const [notifyMessageId, setNotifyMessageId] = useState<string | null>(null);
   const notifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchProgress = useRef(new Animated.Value(0)).current;
-  const searchInputRef = useRef<TextInput>(null);
-  const searchWidth = searchProgress.interpolate({ inputRange: [0, 1], outputRange: [46, Math.min(Dimensions.get('window').width, 430) - 24] });
-  const headerContentOpacity = searchProgress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [1, 0, 0] });
-  const searchInputOpacity = searchProgress.interpolate({ inputRange: [0, 0.38, 1], outputRange: [0, 0, 1] });
-  const searchBackground = searchProgress.interpolate({ inputRange: [0, 0.45, 1], outputRange: ['#0A254A', '#0A254A', '#FFFFFF'] });
-
-  const openSearch = () => {
-    setSearchOpen(true);
-    Animated.timing(searchProgress, { toValue: 1, duration: 340, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start(() => searchInputRef.current?.focus());
-  };
-  const closeSearch = () => {
-    searchInputRef.current?.blur();
-    Animated.timing(searchProgress, { toValue: 0, duration: 320, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start(() => {
-      setSearchOpen(false);
-      setSearchQuery('');
-    });
-  };
-
   useEffect(() => {
     setSelectedBrands(new Set());
     setSelectedShipping(new Set());
@@ -97,6 +82,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const requestNotification = useCallback((productId: string) => {
     if (notifyTimer.current) clearTimeout(notifyTimer.current);
     if (notifiedIds.has(productId)) {
+      toast.hide();
       setNotifiedIds(current => {
         const next = new Set(current);
         next.delete(productId);
@@ -107,20 +93,19 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
       return;
     }
     setNotifiedIds(current => new Set(current).add(productId));
+    toast.show();
     setNotifyMessageId(productId);
     notifyTimer.current = setTimeout(() => {
       setNotifyMessageId(null);
       notifyTimer.current = null;
     }, 1000);
-  }, [notifiedIds]);
+  }, [notifiedIds, toast]);
 
   const activeFilterCount = appliedBrands.size + appliedShipping.size;
   const selectedSortLabel = sortOptions.find(option => option.value === sortMode)?.label ?? 'Recommended';
 
   const visibleProducts = useMemo(() => {
     const filtered = products.filter(product => {
-      const query = searchQuery.trim().toLowerCase();
-      if (query && !`${product.title} ${product.vendor} ${product.brandName?.value ?? ''}`.toLowerCase().includes(query)) return false;
       const brand = product.brandName?.value.trim() ?? '';
       if (appliedBrands.size && !appliedBrands.has(brand)) return false;
       if (appliedShipping.size && !appliedShipping.has(product.vendor.trim())) return false;
@@ -130,7 +115,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     if (sortMode === 'Price: High') filtered.sort((a, b) => Number(b.variants.nodes[0]?.price.amount ?? 0) - Number(a.variants.nodes[0]?.price.amount ?? 0));
     if (sortMode === 'Name') filtered.sort((a, b) => a.title.localeCompare(b.title));
     return filtered;
-  }, [products, searchQuery, appliedBrands, appliedShipping, sortMode]);
+  }, [products, appliedBrands, appliedShipping, sortMode]);
 
   const toggleBrand = (brand: string) => setSelectedBrands(current => {
     const next = new Set(current);
@@ -152,41 +137,23 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     onApplyFilters(brandsToApply, shippingToApply);
   };
   const collections = category.items.length ? category.items : [category];
-  const productGrid = useMemo(() => <View style={s.productGrid}>
-    {visibleProducts.map(product => {
-      const variant = product.variants.nodes[0];
-      const imageUrl = product.images.nodes[0]?.url;
-      const price = Number(variant?.price.amount ?? 0);
-      const compareAtPrice = Number(variant?.compareAtPrice?.amount ?? 0);
-      const hasDiscount = compareAtPrice > price && price > 0;
-      const discountPercent = hasDiscount ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100) : 0;
-      const availableForSale = variant?.availableForSale ?? false;
-      return <View key={product.id} style={s.productCard}>
-        <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
-          {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
-          {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>-{discountPercent}%</Text></View> : null}
-          <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={20} color={favoriteIds.has(product.id) ? '#B85C5C' : '#3F72E5'} /></Pressable>
-          <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View>{notifyMessageId === product.id ? <View pointerEvents="none" style={s.notifyToast}><Text style={s.notifyToastText}>We&apos;ll notify you</Text></View> : null}</View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
-        </Pressable>
-        <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
-        <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={[s.price, hasDiscount && s.discountedPrice]}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
-      </View>;
-    })}
-    {!visibleProducts.length ? <Text style={s.empty}>No products match this filter.</Text> : null}
-  </View>, [favoriteIds, notifiedIds, notifyMessageId, onAdd, onOpenProduct, onToggleFavorite, requestNotification, visibleProducts]);
-
   return <View style={s.page}>
-    <View style={[s.header, { backgroundColor: '#0A254A', borderColor: '#294565' }]}>
-      <Animated.View pointerEvents={searchOpen ? 'none' : 'auto'} style={{ opacity: headerContentOpacity }}><Pressable onPress={onBack} style={[s.headerButton, { borderColor: 'rgba(255,255,255,0.45)' }]}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable></Animated.View>
-      <Animated.View pointerEvents={searchOpen ? 'none' : 'auto'} style={[s.headerCopy, { opacity: headerContentOpacity }]}><Text numberOfLines={1} style={[s.headerTitle, { color: '#FFFFFF' }]}>{category.title.trim()}</Text><Text style={[s.headerSubtitle, { color: '#B9D6FF' }]}>Shop from verified collections</Text></Animated.View>
-      <Animated.View style={[s.searchControl, { width: searchWidth, backgroundColor: searchBackground }]}>
-        {searchOpen ? <Animated.View style={[s.searchInputWrap, { opacity: searchInputOpacity }]}><TextInput ref={searchInputRef} value={searchQuery} onChangeText={setSearchQuery} placeholder="Search products" placeholderTextColor="#7B8490" returnKeyType="search" style={s.searchInput} /></Animated.View> : null}
-        <Pressable onPress={searchOpen ? closeSearch : openSearch} style={[s.searchIconButton, searchOpen && s.searchIconButtonOpen]}><Ionicons name={searchOpen ? 'close' : 'search-outline'} size={24} color={searchOpen ? '#0A254A' : '#FFFFFF'} /></Pressable>
-      </Animated.View>
+    <View style={s.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} style={s.headerButton}><Ionicons name="arrow-back" size={25} color="#FFFFFF" /></Pressable>
+      <View style={s.headerCopy}><Text numberOfLines={2} style={s.headerTitle}>{category.title.trim()}</Text><Text numberOfLines={2} style={s.headerSubtitle}>Shop from verified collections</Text></View>
+      <View style={s.headerActions}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open search" onPress={onOpenSearch} style={s.headerButton}><Ionicons name="search-outline" size={25} color="#FFFFFF" /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open wishlist" onPress={onOpenWishlist} style={s.headerButton}><Ionicons name={favoriteIds.size ? 'heart' : 'heart-outline'} size={25} color="#FFFFFF" />{favoriteIds.size ? <View style={s.headerBadge}><Text style={s.headerBadgeText}>{favoriteIds.size > 99 ? '99+' : favoriteIds.size}</Text></View> : null}</Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open cart" onPress={onOpenCart} style={s.headerButton}><Ionicons name="bag-handle-outline" size={25} color="#FFFFFF" />{cartCount ? <View style={s.headerBadge}><Text style={s.headerBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable>
+      </View>
     </View>
 
+    <View style={s.controls}>
+      <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
+      <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
+    </View>
     <View style={s.content}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.collectionRail} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="fast" scrollEventThrottle={16} overScrollMode="never" contentContainerStyle={s.collectionRailContent}>
+      <ScrollView showsVerticalScrollIndicator={false} style={s.collectionRail} bounces directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} overScrollMode="never" contentContainerStyle={s.collectionRailContent}>
         {collections.map(collection => {
           const active = collection.id === selectedCollection.id;
           const preview = collection.resource ? previews[collection.resource.id] : undefined;
@@ -225,21 +192,16 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                   <Text style={[s.price, hasDiscount && s.discountedPrice]}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>
                   {hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}
                 </View>
-                <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD TO CART</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View>{notifyMessageId === product.id ? <View pointerEvents="none" style={s.notifyToast}><Text style={s.notifyToastText}>We&apos;ll notify you</Text></View> : null}</View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
+                <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD TO CART</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
               </View>;
             })}
             {!visibleProducts.length ? <Text style={s.empty}>No products match this filter.</Text> : null}
           </View>}
-          {loading ? <CollectionCartonLoader /> : productGrid}
           {!loading && hasNextPage ? <Pressable disabled={loadingMore} onPress={onLoadMore} style={[s.loadMoreButton, loadingMore && s.loadMoreButtonDisabled]}>
             {loadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={s.loadMoreButtonText}>Load more</Text>}
           </Pressable> : null}
         </ScrollView>
       </View>
-    </View>
-    <View style={s.controls}>
-      <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
-      <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
     </View>
     <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={() => setFilterVisible(false)}>
       <Pressable style={s.filterBackdrop} onPress={() => setFilterVisible(false)}>
@@ -288,20 +250,23 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
 
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#E9EDF2' },
-  header: { height: 76, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderColor: '#D5DBE3', backgroundColor: '#E9EDF2' },
-  headerButton: { width: 46, height: 46, borderWidth: 1, borderColor: '#E4E4E4', borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { flex: 1 },
-  headerTitle: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
-  headerSubtitle: { marginTop: 3, color: '#287F7A', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
+  header: { minHeight: 76, paddingHorizontal: 8, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderColor: '#294565', backgroundColor: '#0A254A' },
+  headerButton: { position: 'relative', width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, minWidth: 0 },
+  headerTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 20, fontWeight: '900' },
+  headerSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 13, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerBadge: { position: 'absolute', top: 1, right: 0, minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434', borderWidth: 1, borderColor: '#0A254A' },
+  headerBadgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' },
   searchControl: { position: 'absolute', right: 12, height: 46, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)', borderRadius: 23, backgroundColor: '#0A254A', zIndex: 5 },
   searchInputWrap: { flex: 1, height: 44 },
   searchInput: { flex: 1, minWidth: 0, height: 44, paddingLeft: 16, paddingRight: 4, color: '#17202B', fontFamily: 'Inter_400Regular', fontSize: 14, backgroundColor: '#FFFFFF' },
   searchIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   searchIconButtonOpen: { backgroundColor: '#FFFFFF' },
-  content: { flex: 1 },
-  collectionRail: { flexGrow: 0, backgroundColor: '#F3F6FA', borderBottomWidth: 1, borderColor: '#DDE3EB' },
-  collectionRailContent: { paddingHorizontal: 10, paddingVertical: 7, gap: 7 },
-  collectionRailItem: { width: 82, minHeight: 84, paddingHorizontal: 4, paddingVertical: 5, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 10 },
+  content: { flex: 1, minHeight: 0, flexDirection: 'row' },
+  collectionRail: { width: 70, flexGrow: 0, flexShrink: 0, backgroundColor: '#F3F6FA', borderRightWidth: 1, borderColor: '#DDE3EB' },
+  collectionRailContent: { paddingHorizontal: 4, paddingVertical: 8, gap: 7 },
+  collectionRailItem: { width: '100%', minHeight: 78, paddingHorizontal: 2, paddingVertical: 5, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 10 },
   collectionRailItemActive: { borderColor: '#285FCB', backgroundColor: '#3F72E5' },
   collectionImageBlock: { width: 50, height: 50, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.11, shadowRadius: 3, elevation: 2 },
   collectionImageBlockActive: { backgroundColor: '#FFFFFF' },
@@ -309,7 +274,7 @@ const s = StyleSheet.create({
   collectionImage: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
   collectionName: { marginTop: 4, color: '#555555', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 11, textAlign: 'center', fontWeight: '700' },
   collectionNameActive: { color: '#FFFFFF', fontWeight: '900' },
-  productsPanel: { flex: 1, backgroundColor: '#FFFFFF' },
+  productsPanel: { flex: 1, minWidth: 0, backgroundColor: '#FFFFFF' },
   controls: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#DDE2E8', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 10 },
   control: { flex: 1, minWidth: 0, height: 42, paddingHorizontal: 8, borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF' },
   controlActive: { borderColor: '#3F72E5', backgroundColor: '#3F72E5' },
@@ -318,11 +283,11 @@ const s = StyleSheet.create({
   selectedHeading: { paddingHorizontal: 14, paddingTop: 3, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: '#E5E5E5' },
   selectedTitle: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 20, fontWeight: '900' },
   resultCount: { marginTop: 1, color: '#777777', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 12, fontWeight: '600' },
-  productScroll: { paddingTop: 14, paddingHorizontal: 14, paddingBottom: 30 },
+  productScroll: { paddingTop: 12, paddingHorizontal: 8, paddingBottom: 30 },
   collectionLoader: { height: 180, alignItems: 'center', justifyContent: 'center' },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
   productCard: { width: '48.2%', marginBottom: 4, backgroundColor: '#FFFFFF' },
-  productImageBlock: { width: '100%', aspectRatio: 0.78, overflow: 'hidden', borderWidth: 1, borderColor: '#ECEDEF', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8F8F8' },
+  productImageBlock: { width: '100%', aspectRatio: 0.78, overflow: 'hidden', borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   productImage: { position: 'absolute', width: '98%', height: '98%' },
   unavailableImage: { opacity: 0.42 },
   unavailableDetails: { opacity: 0.48 },
@@ -331,7 +296,7 @@ const s = StyleSheet.create({
   comingSoonBadge: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   comingSoonBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   imageActionButton: { width: '100%', height: 46, marginTop: 10, borderWidth: 1, borderColor: '#3F72E5', borderRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5' },
-  imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, letterSpacing: 0.3, fontWeight: '900' },
+  imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   notifyButton: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
   notifyButtonText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
@@ -340,8 +305,8 @@ const s = StyleSheet.create({
   notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   heart: { position: 'absolute', right: 8, bottom: 8, width: 38, height: 38, borderWidth: 1, borderColor: '#E2E4E7', borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 },
   productName: { minHeight: 40, marginTop: 10, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  priceRow: { minHeight: 24, marginTop: 4, flexDirection: 'row', alignItems: 'baseline', columnGap: 6, overflow: 'hidden' },
-  price: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
+  priceRow: { minHeight: 24, marginTop: 4, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 },
+  price: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
   discountedPrice: { color: '#D83434' },
   comparePrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
   empty: { width: '100%', marginTop: 50, color: '#777777', textAlign: 'center' },

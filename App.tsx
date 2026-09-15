@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { NotificationToastProvider, useNotificationToast } from './src/NotificationToast';
 import {
   Alert,
   ActivityIndicator,
@@ -203,6 +204,7 @@ function parseTechSpecTable(value?: string) {
 }
 
 function useNotifyConfirmation() {
+  const toast = useNotificationToast();
   const [notified, setNotified] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -214,12 +216,14 @@ function useNotifyConfirmation() {
   const notify = () => {
     if (timer.current) clearTimeout(timer.current);
     if (notified) {
+      toast.hide();
       setNotified(false);
       setShowMessage(false);
       timer.current = null;
       return;
     }
     setNotified(true);
+    toast.show();
     setShowMessage(true);
     timer.current = setTimeout(() => {
       setShowMessage(false);
@@ -233,7 +237,6 @@ function useNotifyConfirmation() {
 function NotifyConfirmation({ notified, showMessage, color = '#2E8B36' }: { notified: boolean; showMessage: boolean; color?: string }) {
   return <>
     {notified ? <View style={styles.notifyIconWrap}><Ionicons name="notifications" size={18} color={color} /><View style={styles.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={[styles.collectionImageActionText, { color }]}>NOTIFY</Text>}
-    {showMessage ? <View pointerEvents="none" style={styles.notifyToast}><Text style={styles.notifyToastText}>We&apos;ll notify you</Text></View> : null}
   </>;
 }
 
@@ -619,6 +622,7 @@ function Storefront() {
   const [carouselCycle, setCarouselCycle] = useState(0);
   const [activeCategory, setActiveCategory] = useState('Audio');
   const [homeProductListing, setHomeProductListing] = useState<'trending' | 'bestSelling'>('trending');
+  const [discoverySearchReturnScreen, setDiscoverySearchReturnScreen] = useState<ReturnScreen>('home');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteProducts, setFavoriteProducts] = useState<Record<string, Product>>({});
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -756,7 +760,7 @@ function Storefront() {
       if (screen === 'categoryCollection') { setScreen(categoryCollectionReturnScreen); return true; }
       if (screen === 'wishlist') { setScreen('home'); return true; }
       if (screen === 'search') { setScreen('home'); return true; }
-      if (screen === 'discoverySearch') { setScreen('homeProducts'); return true; }
+      if (screen === 'discoverySearch') { setScreen(discoverySearchReturnScreen); return true; }
       if (screen === 'homeProducts') { setScreen('home'); return true; }
       if (screen === 'offers') { setScreen('home'); return true; }
       if (screen === 'orders') { setScreen('home'); return true; }
@@ -765,7 +769,7 @@ function Storefront() {
       return false;
     });
     return () => subscription.remove();
-  }, [cartItems, cartReturnScreen, categoryCollectionReturnScreen, productReturnScreen, screen]);
+  }, [cartItems, cartReturnScreen, categoryCollectionReturnScreen, discoverySearchReturnScreen, productReturnScreen, screen]);
 
   useEffect(() => {
     if (screen === 'home' || screen === 'categories' || screen === 'orders' || screen === 'wishlist' || screen === 'offers') {
@@ -779,7 +783,7 @@ function Storefront() {
   const browseViewportHeightRef = useRef(0);
   const browseChromeProgress = useRef(new Animated.Value(0)).current;
   const browseFooterProgress = useRef(new Animated.Value(0)).current;
-  const collapseBrowseChrome = screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile';
+  const collapseBrowseChrome = screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile';
   const storefrontHeaderVisible = collapseBrowseChrome
     && screen !== 'profile'
     && !openingAnimationVisible
@@ -833,7 +837,7 @@ function Storefront() {
   const profileEntranceOpacity = profileEntranceProgress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.35, 1] });
   const backRevealOpacity = 1;
   const backRevealTranslateX = 0;
-  const homeHeaderHeight = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') ? 126 : 82, 0] });
+  const homeHeaderHeight = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [74, 0] });
   const homeHeaderOpacity = browseChromeProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const homeFooterTranslateY = browseFooterProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 74] });
   const homeFooterOpacity = browseFooterProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
@@ -862,6 +866,11 @@ function Storefront() {
   };
   const catalog = shopifyProducts;
   const cartCount = useMemo(() => cartItems.reduce((total, item) => total + item.quantity, 0), [cartItems]);
+  useEffect(() => {
+    if (!cartPopupVisible) return;
+    const timer = setTimeout(() => setCartPopupVisible(false), 3000);
+    return () => clearTimeout(timer);
+  }, [cartCount, cartPopupVisible]);
   const recommendations = useMemo(() => catalog.slice(0, 4), [catalog]);
   const wishlistProducts = useMemo(() => Object.values(favoriteProducts), [favoriteProducts]);
   const localSearchMatches = useMemo(() => {
@@ -1405,6 +1414,11 @@ function Storefront() {
     });
   };
 
+  const openDiscoverySearch = (origin: ReturnScreen = 'home') => {
+    setDiscoverySearchReturnScreen(origin);
+    setScreen('discoverySearch');
+  };
+
   const openPincodeModal = () => {
     pincodeModalProgress.setValue(0);
     setPincodeModalVisible(true);
@@ -1507,6 +1521,10 @@ function Storefront() {
       loadingMore={collectionPageLoadingMore}
       hasNextPage={collectionPageHasNext}
       favoriteIds={favorites}
+      cartCount={cartCount}
+      onOpenSearch={() => openDiscoverySearch('categoryCollection')}
+      onOpenWishlist={() => openFooterPage('wishlist')}
+      onOpenCart={openCart}
       onLoadMore={loadMoreCollectionProducts}
       onApplyFilters={applyCollectionFilters}
       onBack={() => navigateBack(categoryCollectionReturnScreen)}
@@ -1531,10 +1549,10 @@ function Storefront() {
 
   if (screen === 'homeProducts') {
     const listingProducts = homeProductListing === 'trending' ? categoryProducts : bestSellingHomeProducts;
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><HomeProductListingPage title={homeProductListing === 'trending' ? 'Trending' : 'Best Selling'} products={listingProducts} favoriteIds={favorites} cartCount={cartCount} onBack={() => navigateBack('home')} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} onOpenSearch={() => setScreen('discoverySearch')} onOpenCart={openCart} onOpenWishlist={() => openFooterPage('wishlist')} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 76 }} /> : null}</Animated.View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><HomeProductListingPage title={homeProductListing === 'trending' ? 'Trending' : 'Best Selling'} products={listingProducts} favoriteIds={favorites} cartCount={cartCount} onBack={() => navigateBack('home')} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} onOpenSearch={() => openDiscoverySearch('homeProducts')} onOpenCart={openCart} onOpenWishlist={() => openFooterPage('wishlist')} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 76 }} /> : null}</Animated.View></SafeAreaView>;
   }
 
-  if (screen === 'discoverySearch') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDiscoverySearchPage products={bestSellingHomeProducts.length ? bestSellingHomeProducts : shopifyProducts} favoriteIds={favorites} onBack={() => navigateBack('homeProducts')} onSearch={runSearch} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 12 }} /> : null}</Animated.View></SafeAreaView>;
+  if (screen === 'discoverySearch') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDiscoverySearchPage products={bestSellingHomeProducts.length ? bestSellingHomeProducts : shopifyProducts} favoriteIds={favorites} onBack={() => navigateBack(discoverySearchReturnScreen)} onSearch={runSearch} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 12 }} /> : null}</Animated.View></SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations;
@@ -1594,43 +1612,40 @@ function Storefront() {
       <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
       <Animated.View style={[styles.app, activeFooterTab === 'home' && styles.homeEntranceBackground, { width: contentWidth, opacity: Animated.multiply(storefrontEntranceProgress, backRevealOpacity), transform: [{ translateX: backRevealTranslateX }] }]}>
         {collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
-          <View style={[styles.deliveryHeader, screen === 'home' && styles.homeHeroSurface]}>
+          <View style={styles.deliveryHeader}>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.white} /><Text style={[styles.addAddressText, styles.homeHeaderText]}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
           <View style={styles.deliveryActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch(screen as ReturnScreen)} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}>
               <Ionicons name="bag-handle-outline" size={25} color={palette.white} />
               {cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}
             </Pressable>
-            <View>
-              <Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.white} /></Pressable>
-            </View>
           </View>
           </View>
-          {(screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile') ? <View style={[styles.transportLane, styles.homeHeroSurface]} pointerEvents="none"><View style={styles.orbitLine} /><Animated.View style={[styles.orbitLine, styles.redTrack, { opacity: flightPhaseOpacity }]} /><Animated.View style={[styles.orbitLine, styles.blueTrack, { opacity: truckPhaseOpacity }]} /><Animated.View style={[styles.transportTrail, styles.flightTrail, { width: contentWidth, opacity: flightPhaseOpacity, transform: [{ translateX: flightTrailOffset }, { scaleX: flightTrailScale }] }]} /><Animated.View style={[styles.transportTrail, styles.truckTrail, { width: contentWidth, opacity: truckPhaseOpacity, transform: [{ translateX: truckTrailOffset }, { scaleX: truckTrailScale }] }]} /><Animated.View style={[styles.transportFlight, { opacity: flightPhaseOpacity, transform: [{ translateX: flightTranslateX }] }]}><Ionicons name="airplane" size={38} color={palette.blue} /></Animated.View><Animated.View style={[styles.transportTruck, { opacity: truckPhaseOpacity, transform: [{ translateX: truckTranslateX }] }]}><MaterialCommunityIcons name="truck-fast-outline" size={42} color={palette.red} /></Animated.View></View> : null}
         </Animated.View> : <View style={styles.deliveryHeader}>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.ink} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable><Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)}><Ionicons name="person-circle" size={46} color={palette.ink} /></Pressable></View>
+          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch('home')} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable></View>
         </View>}
 
-        {screen === 'home' && <Animated.View style={[styles.staticSearchZone, styles.homeHeroSurface, { opacity: homeSearchEntrance, transform: [{ translateY: homeSearchTranslateY }] }]}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={20} color={palette.ink} />
-            <View style={styles.searchInputWrap}>
-              {!searchQuery ? <Animated.Text pointerEvents="none" style={[styles.searchAnimatedPlaceholder, { opacity: searchPlaceholderOpacity, transform: [{ translateY: searchPlaceholderY }] }]}>{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}</Animated.Text> : null}
-              <TextInput value={searchQuery} onChangeText={setSearchQuery} onFocus={() => setKeyboardVisible(true)} onBlur={() => setKeyboardVisible(false)} onSubmitEditing={submitSearch} returnKeyType="search" style={styles.searchInput} />
-            </View>
-          </View>
-        </Animated.View>}
+        {screen === 'home' ? <View style={styles.homePinnedMenu}><ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
+          {displayHomeMenus.map((menu, index) => <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, activeCategory === menu.label && styles.blinkTabActive]}>
+            {activeCategory !== menu.label && <LinearGradient pointerEvents="none" colors={['#FFFFFF', '#EEF2F7']} style={styles.blinkTabGradient} />}
+            <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={19} color={activeCategory === menu.label ? palette.white : palette.ink} />
+            <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
+            {activeCategory === menu.label && <View style={styles.blinkTabIndicator} />}
+          </Pressable>)}
+        </ScrollView></View> : null}
 
         <Animated.ScrollView
           key={screen}
-          style={{ backgroundColor: activeFooterTab === 'home' ? '#0A254A' : palette.white }}
+          style={{ backgroundColor: palette.white }}
           showsVerticalScrollIndicator={false}
           bounces
           alwaysBounceVertical
@@ -1657,17 +1672,7 @@ function Storefront() {
         >
           {screen === 'home' ? <>
           <Animated.View style={{ opacity: homeCarouselEntrance, transform: [{ translateY: homeCarouselTranslateY }] }}>
-          <View style={[styles.carouselHeaderZone, styles.homeHeroSurface]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
-            {displayHomeMenus.map((menu, index) => (
-              <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, activeCategory === menu.label && styles.blinkTabActive]}>
-                {activeCategory !== menu.label && <LinearGradient pointerEvents="none" colors={['#FFFFFF', '#EEF2F7']} style={styles.blinkTabGradient} />}
-                <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={19} color={activeCategory === menu.label ? palette.white : palette.ink} />
-                <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
-                {activeCategory === menu.label && <View style={styles.blinkTabIndicator} />}
-              </Pressable>
-            ))}
-          </ScrollView>
+          <View style={[styles.carouselHeaderZone, styles.homeContentSurface]}>
           <View style={styles.carouselFade}>
           {carouselSlides.length ? <><ScrollView
             horizontal
@@ -1820,9 +1825,9 @@ function Storefront() {
             <Ionicons name={activeFooterTab === 'orders' ? 'bag-handle' : 'bag-handle-outline'} size={25} color={activeFooterTab === 'orders' ? palette.blue : '#555'} />
             <Text style={[styles.footerTabText, activeFooterTab === 'orders' && styles.footerTabActive]}>Orders</Text>
           </Pressable>
-          <Pressable onPress={() => openFooterPage('wishlist')} style={[styles.footerTab, activeFooterTab === 'wishlist' && styles.footerTabSelected]}>
-            <Ionicons name={activeFooterTab === 'wishlist' ? 'heart' : 'heart-outline'} size={25} color={activeFooterTab === 'wishlist' ? palette.blue : '#555'} />
-            <Text style={[styles.footerTabText, activeFooterTab === 'wishlist' && styles.footerTabActive]}>Wishlist</Text>
+          <Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.footerTab}>
+            <Ionicons name={customerAuth.isLoggedIn ? 'person' : 'person-outline'} size={25} color="#555" />
+            <Text style={styles.footerTabText}>Account</Text>
           </Pressable>
           <Pressable onPress={openOffers} style={[styles.footerTab, styles.offersFooterTab, activeFooterTab === 'offers' && styles.footerTabSelected]}>
             <View style={styles.offersFooterBadge}><Image source={footerDiscountTag} style={styles.offersFooterImage} resizeMode="contain" /></View>
@@ -1904,13 +1909,14 @@ export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular });
   const showDashboard = typeof window !== 'undefined' && window.location && new URLSearchParams(window.location.search).has('dashboard');
   if (!fontsLoaded) return null;
-  return <SafeAreaProvider>{showDashboard ? <DashboardPage /> : <Storefront />}</SafeAreaProvider>;
+  return <SafeAreaProvider><NotificationToastProvider>{showDashboard ? <DashboardPage /> : <Storefront />}</NotificationToastProvider></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F5F5F5' },
   homeSafeArea: { backgroundColor: '#0A254A' },
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
+  homeContentSurface: { position: 'relative', backgroundColor: '#FFFFFF' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
   backRevealPage: { flex: 1 },
   homeEntranceBackground: { backgroundColor: '#0A254A' },
@@ -1929,7 +1935,7 @@ const styles = StyleSheet.create({
   profileHeaderTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   profileHeaderSubtitle: { marginTop: 3, color: '#B9D6FF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   profileHeaderAccount: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
-  deliveryHeader: { minHeight: 92, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 10, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A' },
+  deliveryHeader: { height: 74, paddingHorizontal: 16, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0A254A' },
   transportLane: { height: 34, overflow: 'hidden', position: 'relative', backgroundColor: homeChrome },
   orbitLine: { position: 'absolute', left: 0, right: 0, top: 16, height: 4, borderRadius: 2, backgroundColor: '#C9D2DF' },
   redTrack: { backgroundColor: palette.red },
@@ -1939,9 +1945,9 @@ const styles = StyleSheet.create({
   truckTrail: { backgroundColor: palette.red },
   transportFlight: { position: 'absolute', left: 0, top: -1 },
   transportTruck: { position: 'absolute', left: 0, top: -3 },
-  deliveryBrandBlock: { zIndex: 1, flex: 1, marginLeft: 0, position: 'relative' },
-  deliveryLogo: { width: 184, height: 48, marginTop: -8, marginLeft: -20, alignSelf: 'flex-start' },
-  addAddressButton: { position: 'absolute', left: -2, bottom: -20, minWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  deliveryBrandBlock: { zIndex: 1, flex: 1, alignSelf: 'stretch', justifyContent: 'center', position: 'relative' },
+  deliveryLogo: { width: 158, height: 42, marginLeft: -12, alignSelf: 'flex-start' },
+  addAddressButton: { display: 'none', position: 'absolute', left: -2, bottom: -20, minWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 5 },
   addAddressText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '600', fontStyle: 'italic', textDecorationLine: 'underline' },
   homeHeaderText: { color: palette.white },
   deliveryBrand: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '800' },
@@ -1949,8 +1955,9 @@ const styles = StyleSheet.create({
   deliveryTime: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 31, lineHeight: 36, fontWeight: '900', letterSpacing: -1 },
   deliveryDistance: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, overflow: 'hidden', backgroundColor: '#DCE7FF', color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
   deliveryAddress: { marginTop: 2, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '600' },
-  deliveryActions: { zIndex: 1, flexDirection: 'row', gap: 12, alignItems: 'center' },
-  headerCartButton: { position: 'relative', width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
+  deliveryActions: { zIndex: 1, flexDirection: 'row', gap: 6, alignItems: 'center' },
+  headerActionButton: { position: 'relative', width: 36, height: 42, alignItems: 'center', justifyContent: 'center' },
+  headerCartButton: { position: 'relative', width: 36, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerCartBadge: { position: 'absolute', top: 2, right: 1, minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.red, borderWidth: 1.5, borderColor: '#0A254A' },
   headerCartBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 8, fontWeight: '900' },
   wallet: { width: 47, height: 47, borderRadius: 24, backgroundColor: palette.white, justifyContent: 'center', alignItems: 'center' },
@@ -2035,6 +2042,7 @@ const styles = StyleSheet.create({
   searchLoadMore: { width: 150, height: 44, marginTop: 20, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: palette.blue },
   searchLoadMoreDisabled: { opacity: 0.6 },
   searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
+  homePinnedMenu: { flexShrink: 0, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#E5E9EF', backgroundColor: '#FFFFFF', zIndex: 15, elevation: 4 },
   blinkTabs: { gap: 8, paddingTop: 10, paddingHorizontal: 16, alignItems: 'center', backgroundColor: 'transparent' },
   blinkTab: { minWidth: 96, height: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 14, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
   blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
