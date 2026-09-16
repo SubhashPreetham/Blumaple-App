@@ -61,6 +61,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const toast = useNotificationToast();
   const [filterVisible, setFilterVisible] = useState(false);
   const [sortVisible, setSortVisible] = useState(false);
+  const [showProductScrollHint, setShowProductScrollHint] = useState(true);
   const [selectedBrands, setSelectedBrands] = useState<Set<string>>(new Set());
   const [selectedShipping, setSelectedShipping] = useState<Set<string>>(new Set());
   const [appliedBrands, setAppliedBrands] = useState<Set<string>>(new Set());
@@ -69,6 +70,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const [notifyMessageId, setNotifyMessageId] = useState<string | null>(null);
   const notifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    setShowProductScrollHint(true);
     setSelectedBrands(new Set());
     setSelectedShipping(new Set());
     setAppliedBrands(new Set());
@@ -148,10 +150,6 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
       </View>
     </View>
 
-    <View style={s.controls}>
-      <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={15} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
-      <Pressable onPress={() => setSortVisible(true)} style={s.control}><Ionicons name="swap-vertical" size={18} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort ({selectedSortLabel})</Text><Ionicons name="chevron-down" size={15} color="#2C2D2E" /></Pressable>
-    </View>
     <View style={s.content}>
       <ScrollView showsVerticalScrollIndicator={false} style={s.collectionRail} bounces directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} overScrollMode="never" contentContainerStyle={s.collectionRailContent}>
         {collections.map(collection => {
@@ -159,6 +157,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           const preview = collection.resource ? previews[collection.resource.id] : undefined;
           const imageUrl = preview?.image?.url ?? preview?.products.nodes[0]?.images.nodes[0]?.url;
           return <Pressable key={collection.id} onPress={() => onSelectCollection(collection)} style={[s.collectionRailItem, active && s.collectionRailItemActive]}>
+            {active ? <View pointerEvents="none" style={s.collectionActiveIndicator} /> : null}
             <View style={[s.collectionImageBlock, active && s.collectionImageBlockActive]}>
               <View style={s.collectionImageClip}>{imageUrl ? <Image source={{ uri: imageUrl }} style={s.collectionImage} resizeMode="contain" /> : <Ionicons name="image-outline" size={25} color="#8D9AAF" />}</View>
             </View>
@@ -168,8 +167,11 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
       </ScrollView>
 
       <View style={s.productsPanel}>
-        <View style={s.selectedHeading}><Text style={s.selectedTitle}>{selectedCollection.title.trim()}</Text><Text style={s.resultCount}>{totalProducts === null ? 'Loading count…' : `${totalProducts} products`}</Text></View>
-        <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll}>
+        <View style={s.controls}>
+          <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={16} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={14} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
+          <Pressable onPress={() => setSortVisible(true)} style={[s.control, s.sortControl]}><Ionicons name="swap-vertical" size={16} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort</Text><Ionicons name="chevron-down" size={14} color="#2C2D2E" /></Pressable>
+        </View>
+        <ScrollView showsVerticalScrollIndicator persistentScrollbar indicatorStyle="black" bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll} onScroll={event => { const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent; setShowProductScrollHint(contentOffset.y + layoutMeasurement.height < contentSize.height - 24); }}>
           {loading ? <CollectionCartonLoader /> : <View style={s.productGrid}>
             {visibleProducts.map(product => {
               const variant = product.variants.nodes[0];
@@ -182,17 +184,13 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
               return <View key={product.id} style={s.productCard}>
                 <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
                   {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
-                  {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>-{discountPercent}%</Text></View> : null}
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}>
-                    <Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={22} color={favoriteIds.has(product.id) ? '#B85C5C' : '#2C2D2E'} />
-                  </Pressable>
+                  {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : null}
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={21} color={favoriteIds.has(product.id) ? '#B85C5C' : '#2C2D2E'} /></Pressable>
                 </Pressable>
-                <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
-                <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}>
-                  <Text style={[s.price, hasDiscount && s.discountedPrice]}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>
-                  {hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}
-                </View>
-                <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD TO CART</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>
+                <View style={s.productActionDock}><Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable></View>
+                <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={s.price}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
+                {hasDiscount ? <Text style={s.discountLine}>{discountPercent}% OFF ON MRP</Text> : null}
+                <Text numberOfLines={3} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
               </View>;
             })}
             {!visibleProducts.length ? <Text style={s.empty}>No products match this filter.</Text> : null}
@@ -201,6 +199,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
             {loadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={s.loadMoreButtonText}>Load more</Text>}
           </Pressable> : null}
         </ScrollView>
+        {showProductScrollHint && (visibleProducts.length > 4 || hasNextPage) ? <View pointerEvents="none" style={s.productScrollHint}><Ionicons name="chevron-down" size={16} color="#3F72E5" /><Text style={s.productScrollHintText}>Scroll for more</Text></View> : null}
       </View>
     </View>
     <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={() => setFilterVisible(false)}>
@@ -264,51 +263,54 @@ const s = StyleSheet.create({
   searchIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   searchIconButtonOpen: { backgroundColor: '#FFFFFF' },
   content: { flex: 1, minHeight: 0, flexDirection: 'row' },
-  collectionRail: { width: 70, flexGrow: 0, flexShrink: 0, backgroundColor: '#F3F6FA', borderRightWidth: 1, borderColor: '#DDE3EB' },
+  collectionRail: { width: 70, flexGrow: 0, flexShrink: 0, backgroundColor: '#FFFFFF', borderRightWidth: 1, borderColor: '#DDE3EB' },
   collectionRailContent: { paddingHorizontal: 4, paddingVertical: 8, gap: 7 },
   collectionRailItem: { width: '100%', minHeight: 78, paddingHorizontal: 2, paddingVertical: 5, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 10 },
-  collectionRailItemActive: { borderColor: '#285FCB', backgroundColor: '#3F72E5' },
+  collectionRailItemActive: { borderColor: 'transparent', backgroundColor: 'transparent' },
+  collectionActiveIndicator: { position: 'absolute', right: -4, top: 22, width: 3, height: 34, borderRadius: 2, backgroundColor: '#3F72E5' },
   collectionImageBlock: { width: 50, height: 50, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.11, shadowRadius: 3, elevation: 2 },
   collectionImageBlockActive: { backgroundColor: '#FFFFFF' },
   collectionImageClip: { width: '100%', height: '100%', borderRadius: 9, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   collectionImage: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
   collectionName: { marginTop: 4, color: '#555555', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 11, textAlign: 'center', fontWeight: '700' },
-  collectionNameActive: { color: '#FFFFFF', fontWeight: '900' },
+  collectionNameActive: { color: '#285FCB', fontWeight: '900' },
   productsPanel: { flex: 1, minWidth: 0, backgroundColor: '#FFFFFF' },
-  controls: { minHeight: 64, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: '#DDE2E8', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 7, elevation: 10 },
-  control: { flex: 1, minWidth: 0, height: 42, paddingHorizontal: 8, borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF' },
+  controls: { height: 54, paddingHorizontal: 7, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#E5E8EC', backgroundColor: '#FFFFFF' },
+  control: { flex: 1, minWidth: 0, height: 40, paddingHorizontal: 7, borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: '#FFFFFF' },
+  sortControl: { flex: 1 },
   controlActive: { borderColor: '#3F72E5', backgroundColor: '#3F72E5' },
   controlText: { flexShrink: 1, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   controlTextActive: { color: '#FFFFFF' },
-  selectedHeading: { paddingHorizontal: 14, paddingTop: 3, paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: '#E5E5E5' },
-  selectedTitle: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 20, fontWeight: '900' },
-  resultCount: { marginTop: 1, color: '#777777', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 12, fontWeight: '600' },
   productScroll: { paddingTop: 12, paddingHorizontal: 8, paddingBottom: 30 },
+  productScrollHint: { position: 'absolute', left: '50%', bottom: 10, minWidth: 112, height: 34, marginLeft: -56, paddingHorizontal: 12, borderWidth: 1, borderColor: '#D4DEEC', borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.96)', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 5, elevation: 5 },
+  productScrollHintText: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '800' },
   collectionLoader: { height: 180, alignItems: 'center', justifyContent: 'center' },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
   productCard: { width: '48.2%', marginBottom: 4, backgroundColor: '#FFFFFF' },
-  productImageBlock: { width: '100%', aspectRatio: 0.78, overflow: 'hidden', borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  productImage: { position: 'absolute', width: '98%', height: '98%' },
+  productImageBlock: { width: '100%', aspectRatio: 0.88, overflow: 'hidden', borderWidth: 1.25, borderBottomWidth: 0, borderColor: '#C9D3E1', borderTopLeftRadius: 9, borderTopRightRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  productImage: { position: 'absolute', left: '5%', bottom: 4, width: '90%', height: '82%' },
   unavailableImage: { opacity: 0.42 },
   unavailableDetails: { opacity: 0.48 },
   discountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
   discountBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   comingSoonBadge: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   comingSoonBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
-  imageActionButton: { width: '100%', height: 46, marginTop: 10, borderWidth: 1, borderColor: '#3F72E5', borderRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5' },
-  imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
+  productActionDock: { height: 40, borderWidth: 1.25, borderTopWidth: 0, borderColor: '#C9D3E1', borderBottomLeftRadius: 9, borderBottomRightRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', backgroundColor: '#FFFFFF' },
+  imageActionButton: { minWidth: 62, height: 40, marginRight: -1.25, marginBottom: -1.25, paddingHorizontal: 10, borderWidth: 1.25, borderColor: '#3F72E5', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  imageActionText: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   notifyButton: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
   notifyButtonText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
   notifyToast: { position: 'absolute', right: -8, bottom: 30, minWidth: 122, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, alignItems: 'center', backgroundColor: '#1A1C1D', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 5 },
   notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
-  heart: { position: 'absolute', right: 8, bottom: 8, width: 38, height: 38, borderWidth: 1, borderColor: '#E2E4E7', borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3 },
-  productName: { minHeight: 40, marginTop: 10, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  heart: { position: 'absolute', right: 4, top: 4, width: 28, height: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  productName: { minHeight: 54, marginTop: 2, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '700' },
   priceRow: { minHeight: 24, marginTop: 4, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 },
-  price: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
+  price: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   discountedPrice: { color: '#D83434' },
   comparePrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
+  discountLine: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
   empty: { width: '100%', marginTop: 50, color: '#777777', textAlign: 'center' },
   loadMoreButton: { alignSelf: 'center', minWidth: 140, height: 44, marginTop: 24, paddingHorizontal: 24, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E53935', shadowColor: '#7A1714', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 7 },
   loadMoreButtonDisabled: { opacity: 0.65 },
