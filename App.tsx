@@ -1611,6 +1611,7 @@ function Storefront() {
     <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
       <Animated.View style={[styles.app, activeFooterTab === 'home' && styles.homeEntranceBackground, { width: contentWidth, opacity: Animated.multiply(storefrontEntranceProgress, backRevealOpacity), transform: [{ translateX: backRevealTranslateX }] }]}>
+        {screen === 'home' ? <LinearGradient pointerEvents="none" colors={['#0A254A', '#17395F', '#41688D', '#91ABC4', '#F4F7FB']} locations={[0, 0.3, 0.55, 0.78, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.homeChromeGradient} /> : null}
         {collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
           <View style={styles.deliveryHeader}>
           <View style={styles.deliveryBrandBlock}>
@@ -1626,7 +1627,7 @@ function Storefront() {
             </Pressable>
           </View>
           </View>
-        </Animated.View> : <View style={styles.deliveryHeader}>
+        </Animated.View> : <View style={[styles.deliveryHeader, screen === 'home' && styles.homeChromeTransparent]}>
           <View style={styles.deliveryBrandBlock}>
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
@@ -1634,12 +1635,11 @@ function Storefront() {
           <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch('home')} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable></View>
         </View>}
 
-        {screen === 'home' ? <View style={styles.homePinnedMenu}><ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
+        {screen === 'home' ? <View style={styles.homePinnedMenu}><ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="fast" snapToInterval={82} snapToAlignment="start" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
           {displayHomeMenus.map((menu, index) => <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, activeCategory === menu.label && styles.blinkTabActive]}>
-            {activeCategory !== menu.label && <LinearGradient pointerEvents="none" colors={['#FFFFFF', '#EEF2F7']} style={styles.blinkTabGradient} />}
-            <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={19} color={activeCategory === menu.label ? palette.white : palette.ink} />
+            <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={25} color={activeCategory === menu.label ? '#8FC0FF' : '#FFFFFF'} />
             <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
-            {activeCategory === menu.label && <View style={styles.blinkTabIndicator} />}
+            {activeCategory === menu.label ? <View style={styles.blinkTabIndicator} /> : null}
           </Pressable>)}
         </ScrollView></View> : null}
 
@@ -1717,7 +1717,6 @@ function Storefront() {
           <CarouselProgressIndicators count={carouselSlideCount} activeIndex={activeBanner} fill={carouselProgress} /></> : <View style={styles.carouselLoading}><CartonBoxLoader /></View>}
           </View>
           </View>
-          <View style={[styles.zigzagPartition, styles.homeHeroSurface]}>{Array.from({ length: 30 }).map((_, index) => <View key={index} style={styles.zigzagTooth} />)}</View>
           </Animated.View>
           <Animated.View style={[styles.homeProductSections, { opacity: homeCategoryEntrance, transform: [{ translateY: homeCategoryTranslateY }] }]}>
           <HomeSectionHeader title="Shop by Category" showAction={false} />
@@ -1727,7 +1726,6 @@ function Storefront() {
                 openCategoryCollection(group, collection, 'home');
               }
             }}>
-              <View pointerEvents="none" style={[styles.shopCategoryBorderCap, index % 3 === 1 && styles.shopCategoryBorderCapBlue, index % 3 === 2 && styles.shopCategoryBorderCapRed]} />
               <View pointerEvents="none" style={styles.shopCategoryAccent}><View style={styles.shopCategoryAccentInner} /></View>
               <View style={styles.shopCategoryImageBlock}><View style={styles.shopCategoryImageClip}><CollectionArtwork source={image} /></View></View>
               <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.76} style={styles.shopCategoryLabel}>{label}</Text>
@@ -1918,6 +1916,8 @@ const styles = StyleSheet.create({
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
   homeContentSurface: { position: 'relative', backgroundColor: '#FFFFFF' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
+  homeChromeGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 157, zIndex: 0 },
+  homeChromeTransparent: { backgroundColor: 'transparent' },
   backRevealPage: { flex: 1 },
   homeEntranceBackground: { backgroundColor: '#0A254A' },
   loginEntrance: { flex: 1 },
@@ -2042,15 +2042,15 @@ const styles = StyleSheet.create({
   searchLoadMore: { width: 150, height: 44, marginTop: 20, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: palette.blue },
   searchLoadMoreDisabled: { opacity: 0.6 },
   searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  homePinnedMenu: { flexShrink: 0, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#E5E9EF', backgroundColor: '#FFFFFF', zIndex: 15, elevation: 4 },
-  blinkTabs: { gap: 8, paddingTop: 10, paddingHorizontal: 16, alignItems: 'center', backgroundColor: 'transparent' },
-  blinkTab: { minWidth: 96, height: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', borderRadius: 14, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  homePinnedMenu: { position: 'relative', flexShrink: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(92,108,126,0.24)', backgroundColor: 'transparent', zIndex: 15 },
+  blinkTabs: { gap: 2, paddingTop: 11, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent' },
+  blinkTab: { position: 'relative', width: 80, height: 65, paddingHorizontal: 3, paddingTop: 7, paddingBottom: 10, gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
   blinkTabPartition: { borderRightWidth: 0 },
-  blinkTabActive: { borderColor: palette.blue, backgroundColor: palette.blue },
-  blinkTabIndicator: { position: 'absolute', left: 22, right: 22, bottom: 3, height: 2, borderRadius: 2, backgroundColor: palette.white },
-  blinkTabText: { color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
-  blinkTabTextActive: { color: palette.white, fontWeight: '800' },
+  blinkTabActive: { backgroundColor: 'transparent' },
+  blinkTabIndicator: { position: 'absolute', left: 12, right: 12, bottom: -1, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.blue },
+  blinkTabText: { width: '100%', color: '#4D5968', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
+  blinkTabTextActive: { color: palette.blue, fontWeight: '900' },
   promoCards: { gap: 12, paddingVertical: 5 },
   promoCard: { height: 196, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 5 },
   promoImageFrame: { ...StyleSheet.absoluteFill, borderRadius: 19, overflow: 'hidden', backgroundColor: '#FFFFFF' },
@@ -2113,9 +2113,6 @@ const styles = StyleSheet.create({
   shopCategoryItem: { position: 'relative', width: '31.4%', height: 138, paddingHorizontal: 7, paddingTop: 12, paddingBottom: 9, overflow: 'hidden', borderWidth: 1, borderColor: '#E8EDF4', borderTopLeftRadius: 28, borderTopRightRadius: 14, borderBottomLeftRadius: 14, borderBottomRightRadius: 28, alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 8, elevation: 3 },
   shopCategoryItemSpacing: { marginRight: '2.9%' },
   shopCategoryItemMirrored: { borderTopLeftRadius: 14, borderTopRightRadius: 28, borderBottomLeftRadius: 28, borderBottomRightRadius: 14 },
-  shopCategoryBorderCap: { position: 'absolute', left: 15, right: 15, top: 0, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3, backgroundColor: '#0A254A' },
-  shopCategoryBorderCapBlue: { backgroundColor: palette.blue },
-  shopCategoryBorderCapRed: { backgroundColor: palette.red },
   shopCategoryAccent: { position: 'absolute', top: -18, right: -18, width: 57, height: 57, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5FC' },
   shopCategoryAccentInner: { width: 25, height: 25, borderWidth: 5, borderColor: '#FFFFFF', borderRadius: 13 },
   shopCategoryImageBlock: { width: 88, height: 78, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFD' },
