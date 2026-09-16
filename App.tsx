@@ -55,7 +55,7 @@ const palette = {
   white: '#FFFFFF',
 };
 
-const SEARCH_PLACEHOLDERS = ['Watches', 'Cameras', 'Headphones', 'Radios', 'Mobile Cases', 'Tumblers', 'Computer Peripharels', 'System Components'];
+const SEARCH_PLACEHOLDERS = ['Wireless headphones', 'Bluetooth speakers', 'Smart watches', 'Digital cameras', 'Mobile cases', 'Gaming keyboards', 'Computer monitors', 'Power banks', 'USB accessories', 'System components'];
 const CAROUSEL_INTERVAL_MS = 3000;
 const CHECKOUT_ADDRESS_KEY = 'blumaple.checkout.address.v1';
 
@@ -314,8 +314,8 @@ function HomeProductListingPage({ title, products, favoriteIds, cartCount, onBac
 
 const TOP_SEARCHES = ['Headphones', 'Smart Watches', 'Cameras', 'Laptops', 'Speakers', 'Mobile Cases'];
 
-function ProductDiscoverySearchPage({ products, favoriteIds, onBack, onSearch, onFavorite, onAdd, onOpen }: { products: Product[]; favoriteIds: Set<string>; onBack: () => void; onSearch: (query: string) => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
-  const [query, setQuery] = useState('');
+function ProductDiscoverySearchPage({ products, favoriteIds, initialQuery, onBack, onSearch, onFavorite, onAdd, onOpen }: { products: Product[]; favoriteIds: Set<string>; initialQuery?: string; onBack: () => void; onSearch: (query: string) => void; onFavorite: (product: Product) => void; onAdd: (product: Product) => void; onOpen: (product: Product) => void }) {
+  const [query, setQuery] = useState(initialQuery ?? '');
   const cardWidth = Math.max(150, (Math.min(Dimensions.get('window').width, 440) - 44) / 2);
   const submit = (value = query) => {
     const search = value.trim();
@@ -623,6 +623,7 @@ function Storefront() {
   const [activeCategory, setActiveCategory] = useState('Audio');
   const [homeProductListing, setHomeProductListing] = useState<'trending' | 'bestSelling'>('trending');
   const [discoverySearchReturnScreen, setDiscoverySearchReturnScreen] = useState<ReturnScreen>('home');
+  const [discoverySearchInitialQuery, setDiscoverySearchInitialQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteProducts, setFavoriteProducts] = useState<Record<string, Product>>({});
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -635,7 +636,6 @@ function Storefront() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchPlaceholderIndex, setSearchPlaceholderIndex] = useState(0);
   const searchPlaceholderY = useRef(new Animated.Value(0)).current;
-  const searchPlaceholderOpacity = useRef(new Animated.Value(1)).current;
   const [submittedSearch, setSubmittedSearch] = useState('');
   const [remoteSearchProducts, setRemoteSearchProducts] = useState<Product[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -723,31 +723,18 @@ function Storefront() {
 
   useEffect(() => {
     const rotatePlaceholder = () => {
-      Animated.parallel([
-        Animated.timing(searchPlaceholderY, { toValue: -12, duration: 220, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(searchPlaceholderOpacity, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      ]).start(({ finished }) => {
+      Animated.timing(searchPlaceholderY, { toValue: 1, duration: 420, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }).start(({ finished }) => {
         if (!finished) return;
         setSearchPlaceholderIndex(current => (current + 1) % SEARCH_PLACEHOLDERS.length);
-        requestAnimationFrame(() => {
-          searchPlaceholderY.setValue(12);
-          searchPlaceholderOpacity.setValue(0);
-          requestAnimationFrame(() => {
-            Animated.parallel([
-              Animated.timing(searchPlaceholderY, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-              Animated.timing(searchPlaceholderOpacity, { toValue: 1, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            ]).start();
-          });
-        });
+        requestAnimationFrame(() => searchPlaceholderY.setValue(0));
       });
     };
-    const interval = setInterval(rotatePlaceholder, 2000);
+    const interval = setInterval(rotatePlaceholder, 3500);
     return () => {
       clearInterval(interval);
       searchPlaceholderY.stopAnimation();
-      searchPlaceholderOpacity.stopAnimation();
     };
-  }, [searchPlaceholderOpacity, searchPlaceholderY]);
+  }, [searchPlaceholderY]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -1414,8 +1401,9 @@ function Storefront() {
     });
   };
 
-  const openDiscoverySearch = (origin: ReturnScreen = 'home') => {
+  const openDiscoverySearch = (origin: ReturnScreen = 'home', initialQuery = '') => {
     setDiscoverySearchReturnScreen(origin);
+    setDiscoverySearchInitialQuery(initialQuery);
     setScreen('discoverySearch');
   };
 
@@ -1552,7 +1540,7 @@ function Storefront() {
     return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><HomeProductListingPage title={homeProductListing === 'trending' ? 'Trending' : 'Best Selling'} products={listingProducts} favoriteIds={favorites} cartCount={cartCount} onBack={() => navigateBack('home')} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} onOpenSearch={() => openDiscoverySearch('homeProducts')} onOpenCart={openCart} onOpenWishlist={() => openFooterPage('wishlist')} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 76 }} /> : null}</Animated.View></SafeAreaView>;
   }
 
-  if (screen === 'discoverySearch') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDiscoverySearchPage products={bestSellingHomeProducts.length ? bestSellingHomeProducts : shopifyProducts} favoriteIds={favorites} onBack={() => navigateBack(discoverySearchReturnScreen)} onSearch={runSearch} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 12 }} /> : null}</Animated.View></SafeAreaView>;
+  if (screen === 'discoverySearch') return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDiscoverySearchPage products={bestSellingHomeProducts.length ? bestSellingHomeProducts : shopifyProducts} favoriteIds={favorites} initialQuery={discoverySearchInitialQuery} onBack={() => navigateBack(discoverySearchReturnScreen)} onSearch={runSearch} onFavorite={toggleFavorite} onAdd={addToCart} onOpen={openProduct} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: insets.bottom + 12 }} /> : null}</Animated.View></SafeAreaView>;
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations;
@@ -1611,7 +1599,7 @@ function Storefront() {
     <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea]}>
       <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
       <Animated.View style={[styles.app, activeFooterTab === 'home' && styles.homeEntranceBackground, { width: contentWidth, opacity: Animated.multiply(storefrontEntranceProgress, backRevealOpacity), transform: [{ translateX: backRevealTranslateX }] }]}>
-        {screen === 'home' ? <LinearGradient pointerEvents="none" colors={['#0A254A', '#17395F', '#41688D', '#91ABC4', '#F4F7FB']} locations={[0, 0.3, 0.55, 0.78, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.homeChromeGradient} /> : null}
+        {screen === 'home' ? <LinearGradient pointerEvents="none" colors={['#0A254A', '#17395F', '#41688D', '#91ABC4', '#F4F7FB']} locations={[0, 0.28, 0.52, 0.78, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.homeChromeGradient} /> : null}
         {collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
           <View style={styles.deliveryHeader}>
           <View style={styles.deliveryBrandBlock}>
@@ -1632,8 +1620,10 @@ function Storefront() {
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch('home')} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable></View>
+          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable></View>
         </View>}
+
+        {screen === 'home' ? <View style={styles.homeSearchZone}><Pressable accessibilityRole="search" accessibilityLabel="Search products" onPress={() => openDiscoverySearch('home', SEARCH_PLACEHOLDERS[searchPlaceholderIndex])} style={styles.homeSearchButton}><Ionicons name="search-outline" size={23} color={palette.ink} /><View style={styles.homeSearchTextClip}><Animated.View style={[styles.homeSearchTextStack, { transform: [{ translateY: searchPlaceholderY.interpolate({ inputRange: [0, 1], outputRange: [0, -24] }) }] }]}><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}&quot;</Text><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[(searchPlaceholderIndex + 1) % SEARCH_PLACEHOLDERS.length]}&quot;</Text></Animated.View></View><View style={styles.homeSearchDivider} /><Ionicons name="mic-outline" size={21} color={palette.ink} /></Pressable></View> : null}
 
         {screen === 'home' ? <View style={styles.homePinnedMenu}><ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="fast" snapToInterval={82} snapToAlignment="start" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
           {displayHomeMenus.map((menu, index) => <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, activeCategory === menu.label && styles.blinkTabActive]}>
@@ -1916,7 +1906,7 @@ const styles = StyleSheet.create({
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
   homeContentSurface: { position: 'relative', backgroundColor: '#FFFFFF' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
-  homeChromeGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 157, zIndex: 0 },
+  homeChromeGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 221, zIndex: 0 },
   homeChromeTransparent: { backgroundColor: 'transparent' },
   backRevealPage: { flex: 1 },
   homeEntranceBackground: { backgroundColor: '#0A254A' },
@@ -2043,6 +2033,12 @@ const styles = StyleSheet.create({
   searchLoadMoreDisabled: { opacity: 0.6 },
   searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
   homePinnedMenu: { position: 'relative', flexShrink: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(92,108,126,0.24)', backgroundColor: 'transparent', zIndex: 15 },
+  homeSearchZone: { position: 'relative', paddingHorizontal: 15, paddingTop: 3, paddingBottom: 7, backgroundColor: 'transparent', zIndex: 15 },
+  homeSearchButton: { height: 50, paddingHorizontal: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.09, shadowRadius: 6, elevation: 3 },
+  homeSearchTextClip: { flex: 1, height: 24, overflow: 'hidden' },
+  homeSearchTextStack: { height: 48 },
+  homeSearchButtonText: { height: 24, lineHeight: 24, color: '#697586', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '600' },
+  homeSearchDivider: { width: 1, height: 27, backgroundColor: '#E3E6EA' },
   blinkTabs: { gap: 2, paddingTop: 11, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent' },
   blinkTab: { position: 'relative', width: 80, height: 65, paddingHorizontal: 3, paddingTop: 7, paddingBottom: 10, gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
