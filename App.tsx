@@ -2382,7 +2382,7 @@ const styles = StyleSheet.create({
   footerTabActive: { color: palette.blue, fontWeight: '700' },
   offersFooterTab: { paddingHorizontal: 3 },
   offersFooterBadge: { alignSelf: 'stretch', height: 60, alignItems: 'center', justifyContent: 'center' },
-  offersFooterImage: { width: 42, height: 42, shadowColor: '#9D1E1E', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.24, shadowRadius: 4, elevation: 4 },
+  offersFooterImage: { width: 42, height: 42, shadowColor: '#075EAD', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 4, elevation: 4 },
   detailPage: { flex: 1, alignSelf: 'center', backgroundColor: '#F4F5FA' },
   detailContent: { paddingBottom: 0 },
   detailHeroSection: { height: 310, backgroundColor: '#FFFFFF' },
