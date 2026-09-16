@@ -189,7 +189,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                 </Pressable>
                 <View style={s.productActionDock}><Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable></View>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={s.price}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
-                {hasDiscount ? <Text style={s.discountLine}>{discountPercent}% OFF ON MRP</Text> : null}
+                {hasDiscount ? <Text style={s.discountLine}>{discountPercent}% OFF</Text> : null}
                 <Text numberOfLines={3} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
               </View>;
             })}
