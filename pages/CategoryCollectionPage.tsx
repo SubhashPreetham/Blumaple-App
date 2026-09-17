@@ -262,7 +262,7 @@ const s = StyleSheet.create({
   searchIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   searchIconButtonOpen: { backgroundColor: '#FFFFFF' },
   content: { flex: 1, minHeight: 0, flexDirection: 'row' },
-  collectionRail: { width: 88, flexGrow: 0, flexShrink: 0, backgroundColor: '#EEF1F5', borderRightWidth: 1, borderColor: '#D7DEE8' },
+  collectionRail: { width: 88, flexGrow: 0, flexShrink: 0, backgroundColor: '#FFFFFF', borderRightWidth: StyleSheet.hairlineWidth, borderColor: '#E7EBF0' },
   collectionRailContent: { paddingHorizontal: 6, paddingTop: 14, paddingBottom: 18, gap: 8 },
   collectionRailItem: { width: '100%', minHeight: 102, paddingHorizontal: 5, paddingTop: 8, paddingBottom: 7, alignItems: 'center', justifyContent: 'flex-start', borderRadius: 12, backgroundColor: 'transparent' },
   collectionRailItemActive: { backgroundColor: '#3F72E5', shadowColor: '#1D4FAE', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 3 },
