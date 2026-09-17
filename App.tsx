@@ -1608,11 +1608,11 @@ function Storefront() {
           </View>
           <View style={styles.deliveryActions}>
             <Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch(screen as ReturnScreen)} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}>
-              <Ionicons name="bag-handle-outline" size={25} color={palette.white} />
+              <Ionicons name="cart-outline" size={26} color={palette.white} />
               {cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}
             </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open account" hitSlop={8} onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.headerActionButton}><Ionicons name={customerAuth.isLoggedIn ? 'person-circle' : 'person-circle-outline'} size={27} color={palette.white} /></Pressable>
           </View>
           </View>
         </Animated.View> : <View style={[styles.deliveryHeader, screen === 'home' && styles.homeChromeTransparent]}>
@@ -1620,17 +1620,21 @@ function Storefront() {
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel={`Open wishlist${favorites.size ? `, ${favorites.size} products` : ''}`} hitSlop={8} onPress={() => openFooterPage('wishlist')} style={styles.headerActionButton}><Ionicons name={favorites.size ? 'heart' : 'heart-outline'} size={25} color={palette.white} />{favorites.size ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{favorites.size > 99 ? '99+' : favorites.size}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="bag-handle-outline" size={25} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable></View>
+          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="cart-outline" size={26} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open account" hitSlop={8} onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.headerActionButton}><Ionicons name={customerAuth.isLoggedIn ? 'person-circle' : 'person-circle-outline'} size={27} color={palette.white} /></Pressable></View>
         </View>}
 
         {screen === 'home' ? <View style={styles.homeSearchZone}><Pressable accessibilityRole="search" accessibilityLabel="Search products" onPress={() => openDiscoverySearch('home', SEARCH_PLACEHOLDERS[searchPlaceholderIndex])} style={styles.homeSearchButton}><Ionicons name="search-outline" size={23} color={palette.ink} /><View style={styles.homeSearchTextClip}><Animated.View style={[styles.homeSearchTextStack, { transform: [{ translateY: searchPlaceholderY.interpolate({ inputRange: [0, 1], outputRange: [0, -24] }) }] }]}><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}&quot;</Text><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[(searchPlaceholderIndex + 1) % SEARCH_PLACEHOLDERS.length]}&quot;</Text></Animated.View></View><View style={styles.homeSearchDivider} /><Ionicons name="mic-outline" size={21} color={palette.ink} /></Pressable></View> : null}
 
         {screen === 'home' ? <View style={styles.homePinnedMenu}><ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="fast" snapToInterval={82} snapToAlignment="start" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
-          {displayHomeMenus.map((menu, index) => <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, activeCategory === menu.label && styles.blinkTabActive]}>
-            <Ionicons name={menu.label === 'Audio' ? 'headset-outline' : menu.label === 'Capture' ? 'camera-outline' : menu.label === 'Computers' ? 'laptop-outline' : menu.label === 'Smart Tech' ? 'watch-outline' : menu.label === 'Home' ? 'home-outline' : menu.label === 'Lifestyle' ? 'sparkles-outline' : 'build-outline'} size={25} color={activeCategory === menu.label ? '#8FC0FF' : '#FFFFFF'} />
-            <Text style={[styles.blinkTabText, activeCategory === menu.label && styles.blinkTabTextActive]}>{menu.label}</Text>
-            {activeCategory === menu.label ? <View style={styles.blinkTabIndicator} /> : null}
-          </Pressable>)}
+          {displayHomeMenus.map((menu, index) => {
+            const active = activeCategory === menu.label;
+            const icon = menu.label === 'Audio' ? (active ? 'headset' : 'headset-outline') : menu.label === 'Capture' ? (active ? 'camera' : 'camera-outline') : menu.label === 'Computers' ? (active ? 'laptop' : 'laptop-outline') : menu.label === 'Smart Tech' ? (active ? 'watch' : 'watch-outline') : menu.label === 'Home' ? (active ? 'home' : 'home-outline') : menu.label === 'Lifestyle' ? (active ? 'sparkles' : 'sparkles-outline') : (active ? 'build' : 'build-outline');
+            return <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, active && styles.blinkTabActive]}>
+              <View style={styles.blinkTabIconWrap}><Ionicons name={icon} size={25} color={active ? '#3F72E5' : '#FFFFFF'} />{active ? <View style={styles.blinkTabIconAccent} /> : null}</View>
+              <Text style={[styles.blinkTabText, active && styles.blinkTabTextActive]}>{menu.label}</Text>
+              {active ? <View style={styles.blinkTabIndicator} /> : null}
+            </Pressable>;
+          })}
         </ScrollView></View> : null}
 
         <Animated.ScrollView
@@ -1812,9 +1816,9 @@ function Storefront() {
             <Ionicons name={activeFooterTab === 'orders' ? 'bag-handle' : 'bag-handle-outline'} size={25} color={activeFooterTab === 'orders' ? palette.blue : '#555'} />
             <Text style={[styles.footerTabText, activeFooterTab === 'orders' && styles.footerTabActive]}>Orders</Text>
           </Pressable>
-          <Pressable onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.footerTab}>
-            <Ionicons name={customerAuth.isLoggedIn ? 'person' : 'person-outline'} size={25} color="#555" />
-            <Text style={styles.footerTabText}>Account</Text>
+          <Pressable onPress={() => openFooterPage('wishlist')} style={[styles.footerTab, activeFooterTab === 'wishlist' && styles.footerTabSelected]}>
+            <Ionicons name={activeFooterTab === 'wishlist' ? 'heart' : 'heart-outline'} size={25} color={activeFooterTab === 'wishlist' ? palette.blue : '#555'} />
+            <Text style={[styles.footerTabText, activeFooterTab === 'wishlist' && styles.footerTabActive]}>Wishlist</Text>
           </Pressable>
           <Pressable onPress={openOffers} style={[styles.footerTab, styles.offersFooterTab, activeFooterTab === 'offers' && styles.footerTabSelected]}>
             <View style={styles.offersFooterBadge}><Image source={footerDiscountTag} style={styles.offersFooterImage} resizeMode="contain" /></View>
@@ -2040,10 +2044,12 @@ const styles = StyleSheet.create({
   homeSearchDivider: { width: 1, height: 27, backgroundColor: '#E3E6EA' },
   blinkTabs: { gap: 2, paddingTop: 11, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent' },
   blinkTab: { position: 'relative', width: 80, height: 65, paddingHorizontal: 3, paddingTop: 7, paddingBottom: 10, gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  blinkTabIconWrap: { position: 'relative', width: 28, height: 27, alignItems: 'center', justifyContent: 'center' },
+  blinkTabIconAccent: { position: 'absolute', top: 0, right: 0, width: 7, height: 7, borderRadius: 4, borderWidth: 1, borderColor: '#0A254A', backgroundColor: '#D83434' },
   blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
   blinkTabPartition: { borderRightWidth: 0 },
   blinkTabActive: { backgroundColor: 'transparent' },
-  blinkTabIndicator: { position: 'absolute', left: 12, right: 12, bottom: -1, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: palette.blue },
+  blinkTabIndicator: { position: 'absolute', left: 12, right: 12, bottom: -1, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: '#D83434' },
   blinkTabText: { width: '100%', color: '#4D5968', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
   blinkTabTextActive: { color: palette.blue, fontWeight: '900' },
   promoCards: { gap: 12, paddingVertical: 5 },
