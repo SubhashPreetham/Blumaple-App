@@ -1699,7 +1699,7 @@ function Storefront() {
               const centeredOffset = index * 82 + 40 - viewportWidth / 2;
               homeMenuRef.current?.scrollTo({ x: Math.max(0, Math.min(centeredOffset, maximumOffset)), animated: true });
             }} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, active && styles.blinkTabActive]}>
-              <View style={[styles.blinkTabIconWrap, active && styles.blinkTabIconWrapActive]}><Ionicons name={icon} size={active ? 22 : 25} color="#FFFFFF" />{active ? <View style={styles.blinkTabIconAccent} /> : null}</View>
+              <View style={styles.blinkTabIconWrap}><Ionicons name={icon} size={25} color="#FFFFFF" /></View>
               <Text style={[styles.blinkTabText, active && styles.blinkTabTextActive]}>{menu.label}</Text>
               {active ? <View style={styles.blinkTabIndicator} /> : null}
             </Pressable>;
@@ -2117,8 +2117,6 @@ const styles = StyleSheet.create({
   blinkTabs: { gap: 2, paddingTop: 11, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent' },
   blinkTab: { position: 'relative', width: 80, height: 65, paddingHorizontal: 3, paddingTop: 7, paddingBottom: 10, gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   blinkTabIconWrap: { position: 'relative', width: 32, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  blinkTabIconWrapActive: { backgroundColor: 'rgba(10,37,74,0.9)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.34)' },
-  blinkTabIconAccent: { position: 'absolute', top: -1, right: -1, width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#E53935' },
   blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
   blinkTabPartition: { borderRightWidth: 0 },
   blinkTabActive: { backgroundColor: 'transparent' },
