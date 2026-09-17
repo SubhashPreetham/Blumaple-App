@@ -187,7 +187,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                   {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : null}
                   <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={21} color={favoriteIds.has(product.id) ? '#E53935' : '#2C2D2E'} /></Pressable>
                 </Pressable>
-                <View style={s.productActionDock}><Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable></View>
+                <View style={s.productActionDock}><Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton, !availableForSale && notifiedIds.has(product.id) && s.notifiedButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable></View>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={s.price}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
                 {hasDiscount ? <Text style={s.discountLine}>{discountPercent}% OFF</Text> : null}
                 <Text numberOfLines={3} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
@@ -295,10 +295,11 @@ const s = StyleSheet.create({
   discountBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   comingSoonBadge: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   comingSoonBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
-  productActionDock: { position: 'relative', zIndex: 4, height: 34, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
-  imageActionButton: { position: 'absolute', top: -22, right: 0, minWidth: 68, height: 48, paddingHorizontal: 12, borderWidth: 1.5, borderColor: '#3F72E5', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 5, elevation: 5 },
+  productActionDock: { position: 'relative', zIndex: 4, height: 30, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  imageActionButton: { position: 'absolute', top: -18, right: 0, minWidth: 58, height: 40, paddingHorizontal: 10, borderWidth: 1.5, borderColor: '#3F72E5', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 4, elevation: 4 },
   imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
-  notifyButton: { minWidth: 78, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
+  notifyButton: { minWidth: 68, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
+  notifiedButton: { minWidth: 40, width: 40, paddingHorizontal: 0, borderRadius: 9 },
   notifyButtonText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },

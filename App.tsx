@@ -305,7 +305,7 @@ function ProductCard({ item, width, favorite, onFavorite, onAdd, onOpen, showFav
         {!availableForSale ? <View style={styles.collectionComingSoon}><Text style={styles.collectionComingSoonText}>Coming soon</Text></View> : null}
         {showFavorite ? <Pressable hitSlop={10} onPress={onFavorite} style={styles.collectionHeart}><Ionicons name={favorite ? 'heart' : 'heart-outline'} size={19} color={favorite ? WISHLIST_ACTIVE_COLOR : palette.ink} /></Pressable> : null}
       </Pressable>
-      <View style={styles.collectionUnitRow}><Pressable onPress={availableForSale ? onAdd : notifyConfirmation.notify} style={({ pressed }) => [styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction, pressed && styles.pressed]}>{availableForSale ? <Text style={styles.collectionImageActionText}>ADD</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#2E8B36" />}</Pressable></View>
+      <View style={styles.collectionUnitRow}><Pressable onPress={availableForSale ? onAdd : notifyConfirmation.notify} style={({ pressed }) => [styles.collectionImageAction, !availableForSale && styles.collectionNotifyAction, !availableForSale && notifyConfirmation.notified && styles.collectionNotifiedAction, pressed && styles.pressed]}>{availableForSale ? <Text style={styles.collectionImageActionText}>ADD</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#2E8B36" />}</Pressable></View>
       <View style={[styles.collectionPriceRow, !availableForSale && styles.collectionUnavailable]}><Text style={styles.collectionPrice}>{item.price}</Text>{item.oldPrice ? <Text numberOfLines={1} style={styles.collectionOldPrice}>{item.oldPrice}</Text> : null}</View>
       {item.discount ? <Text numberOfLines={1} style={styles.collectionDiscountLine}>{item.discount}</Text> : null}
       <Text numberOfLines={3} style={[styles.collectionProductName, !availableForSale && styles.collectionUnavailable]}>{item.name}</Text>
@@ -2224,10 +2224,11 @@ const styles = StyleSheet.create({
   collectionComingSoon: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   collectionComingSoonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   collectionHeart: { position: 'absolute', right: 4, top: 4, width: 28, height: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  collectionUnitRow: { position: 'relative', zIndex: 4, height: 34, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
-  collectionImageAction: { position: 'absolute', top: -22, right: 0, minWidth: 68, height: 48, paddingHorizontal: 12, borderWidth: 1.5, borderColor: palette.blue, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue, shadowColor: '#0A254A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 5, elevation: 5 },
-  collectionImageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  collectionNotifyAction: { minWidth: 78, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
+  collectionUnitRow: { position: 'relative', zIndex: 4, height: 30, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  collectionImageAction: { position: 'absolute', top: -18, right: 0, minWidth: 58, height: 40, paddingHorizontal: 10, borderWidth: 1.5, borderColor: palette.blue, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue, shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 4, elevation: 4 },
+  collectionImageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  collectionNotifyAction: { minWidth: 68, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
+  collectionNotifiedAction: { minWidth: 40, width: 40, paddingHorizontal: 0, borderRadius: 9 },
   collectionNotifyText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
