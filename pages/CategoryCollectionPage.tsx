@@ -157,7 +157,6 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           const preview = collection.resource ? previews[collection.resource.id] : undefined;
           const imageUrl = preview?.image?.url ?? preview?.products.nodes[0]?.images.nodes[0]?.url;
           return <Pressable key={collection.id} onPress={() => onSelectCollection(collection)} style={[s.collectionRailItem, active && s.collectionRailItemActive]}>
-            {active ? <View pointerEvents="none" style={s.collectionActiveIndicator} /> : null}
             <View style={[s.collectionImageBlock, active && s.collectionImageBlockActive]}>
               <View style={s.collectionImageClip}>{imageUrl ? <Image source={{ uri: imageUrl }} style={s.collectionImage} resizeMode="contain" /> : <Ionicons name="image-outline" size={25} color="#8D9AAF" />}</View>
             </View>
@@ -263,17 +262,16 @@ const s = StyleSheet.create({
   searchIconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   searchIconButtonOpen: { backgroundColor: '#FFFFFF' },
   content: { flex: 1, minHeight: 0, flexDirection: 'row' },
-  collectionRail: { width: 70, flexGrow: 0, flexShrink: 0, backgroundColor: '#FFFFFF', borderRightWidth: 1, borderColor: '#DDE3EB' },
-  collectionRailContent: { paddingHorizontal: 4, paddingVertical: 8, gap: 7 },
-  collectionRailItem: { width: '100%', minHeight: 78, paddingHorizontal: 2, paddingVertical: 5, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 10 },
-  collectionRailItemActive: { borderColor: 'transparent', backgroundColor: 'transparent' },
-  collectionActiveIndicator: { position: 'absolute', right: -4, top: 22, width: 3, height: 34, borderRadius: 2, backgroundColor: '#3F72E5' },
-  collectionImageBlock: { width: 50, height: 50, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.11, shadowRadius: 3, elevation: 2 },
-  collectionImageBlockActive: { backgroundColor: '#FFFFFF' },
-  collectionImageClip: { width: '100%', height: '100%', borderRadius: 9, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  collectionImage: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
-  collectionName: { marginTop: 4, color: '#555555', fontFamily: 'Inter_400Regular', fontSize: 9, lineHeight: 11, textAlign: 'center', fontWeight: '700' },
-  collectionNameActive: { color: '#285FCB', fontWeight: '900' },
+  collectionRail: { width: 88, flexGrow: 0, flexShrink: 0, backgroundColor: '#EEF1F5', borderRightWidth: 1, borderColor: '#D7DEE8' },
+  collectionRailContent: { paddingHorizontal: 6, paddingTop: 14, paddingBottom: 18, gap: 8 },
+  collectionRailItem: { width: '100%', minHeight: 102, paddingHorizontal: 5, paddingTop: 8, paddingBottom: 7, alignItems: 'center', justifyContent: 'flex-start', borderRadius: 12, backgroundColor: 'transparent' },
+  collectionRailItemActive: { backgroundColor: '#3F72E5', shadowColor: '#1D4FAE', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 3 },
+  collectionImageBlock: { width: 62, height: 62, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.11, shadowRadius: 3, elevation: 2 },
+  collectionImageBlockActive: { backgroundColor: '#FFFFFF', shadowOpacity: 0.14, elevation: 3 },
+  collectionImageClip: { width: '100%', height: '100%', borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  collectionImage: { width: '100%', height: '100%', transform: [{ scale: 1.16 }] },
+  collectionName: { marginTop: 6, color: '#555F6C', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 13, textAlign: 'center', fontWeight: '600' },
+  collectionNameActive: { color: '#FFFFFF', fontWeight: '900' },
   productsPanel: { flex: 1, minWidth: 0, backgroundColor: '#FFFFFF' },
   controls: { height: 54, paddingHorizontal: 7, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#E5E8EC', backgroundColor: '#FFFFFF' },
   control: { flex: 1, minWidth: 0, height: 40, paddingHorizontal: 7, borderWidth: 1, borderColor: '#DDDDDD', borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, backgroundColor: '#FFFFFF' },
