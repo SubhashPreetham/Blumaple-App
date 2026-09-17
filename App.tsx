@@ -66,6 +66,7 @@ const FLOATING_CONTROL_GAP = 12;
 const WISHLIST_ACTIVE_COLOR = '#E53935';
 const homeChrome = '#D3DDEA';
 const footerDiscountTag = require('./assets/ui/offers.png');
+const footerHomeLeaf = require('./assets/ui/home-maple-leaf.png');
 
 type Product = {
   id: string;
@@ -908,11 +909,6 @@ function Storefront() {
   };
   const catalog = shopifyProducts;
   const cartCount = useMemo(() => cartItems.reduce((total, item) => total + item.quantity, 0), [cartItems]);
-  useEffect(() => {
-    if (!cartPopupVisible) return;
-    const timer = setTimeout(() => setCartPopupVisible(false), 3000);
-    return () => clearTimeout(timer);
-  }, [cartCount, cartPopupVisible]);
   const recommendations = useMemo(() => catalog.slice(0, 4), [catalog]);
   const wishlistProducts = useMemo(() => Object.values(favoriteProducts), [favoriteProducts]);
   const localSearchMatches = useMemo(() => {
@@ -1877,7 +1873,7 @@ function Storefront() {
         {screen === 'home' && keyboardVisible && searchQuery.trim() ? <View style={styles.searchSuggestions}>{searchLoading && !searchMatches.length ? <View style={styles.searchSuggestionLoading}><RotatingSearchIcon /></View> : searchError ? <Text style={styles.searchNoSuggestions}>{searchError}</Text> : searchMatches.slice(0, 2).map(product => <Pressable key={`suggestion-${product.id}`} onPress={() => { setSearchQuery(''); Keyboard.dismiss(); openProduct(product); }} style={styles.searchSuggestion}><Image source={product.image} style={styles.searchSuggestionImage} resizeMode="contain" /><View style={styles.searchSuggestionCopy}><Text numberOfLines={1} style={styles.searchSuggestionName}>{product.name}</Text><Text style={styles.searchSuggestionPrice}>{product.price}</Text></View><Ionicons name="chevron-forward" size={18} color={palette.blue} /></Pressable>)}{!searchLoading && !searchError && !searchMatches.length ? <Text style={styles.searchNoSuggestions}>No products match this title or SKU</Text> : null}</View> : null}
         <Animated.View style={styles.floatingFooter}>
           <Pressable onPress={() => openFooterPage('home')} style={[styles.footerTab, activeFooterTab === 'home' && styles.footerTabSelected]}>
-            <Ionicons name={activeFooterTab === 'home' ? 'home' : 'home-outline'} size={25} color={activeFooterTab === 'home' ? palette.blue : palette.muted} />
+            <Image source={footerHomeLeaf} style={[styles.footerHomeImage, activeFooterTab !== 'home' && styles.footerHomeImageInactive]} resizeMode="contain" />
             <Text style={[styles.footerTabText, activeFooterTab === 'home' && styles.footerTabActive]}>Home</Text>
           </Pressable>
           <Pressable onPress={() => openFooterPage('categories')} style={[styles.footerTab, activeFooterTab === 'categories' && styles.footerTabSelected]}>
@@ -2403,7 +2399,7 @@ const styles = StyleSheet.create({
   floatingFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, height: 70, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderTopWidth: 1, borderColor: '#D5DBE3' },
   cartPopupLayer: { ...StyleSheet.absoluteFill, zIndex: 50, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 82 },
   collectionCartPopupLayer: {},
-  cartPopup: { width: 174, height: 58, paddingHorizontal: 8, borderRadius: 13, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.blue, shadowColor: '#000000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 7 },
+  cartPopup: { width: 158, height: 50, paddingHorizontal: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: palette.blue, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 7, elevation: 7 },
   cartPopupImage: { width: 38, height: 38, borderRadius: 5, backgroundColor: '#FFFFFF' },
   cartPopupCopy: { flex: 1, marginLeft: 8 },
   cartPopupTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
@@ -2458,6 +2454,8 @@ const styles = StyleSheet.create({
   footerTabSelected: { borderTopColor: palette.blue, backgroundColor: '#F5F5F5' },
   footerTabText: { fontFamily: 'Inter_400Regular', fontSize: 10, color: '#555', fontWeight: '500' },
   footerTabActive: { color: palette.blue, fontWeight: '700' },
+  footerHomeImage: { width: 28, height: 28 },
+  footerHomeImageInactive: { opacity: 0.68 },
   offersFooterTab: { paddingHorizontal: 3 },
   offersFooterBadge: { alignSelf: 'stretch', height: 60, alignItems: 'center', justifyContent: 'center' },
   offersFooterImage: { width: 42, height: 42, shadowColor: '#075EAD', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 4, elevation: 4 },
