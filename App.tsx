@@ -63,7 +63,7 @@ const BOTTOM_NAV_HEIGHT = 70;
 const FLOATING_CART_GAP = 12;
 const FLOATING_CART_HEIGHT = 58;
 const FLOATING_CONTROL_GAP = 12;
-const WISHLIST_ACTIVE_COLOR = '#B85C5C';
+const WISHLIST_ACTIVE_COLOR = '#E53935';
 const homeChrome = '#D3DDEA';
 const footerDiscountTag = require('./assets/ui/offers.png');
 
@@ -1950,7 +1950,7 @@ function Storefront() {
       </Modal>
       {cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}
       <HelpFab cartBottom={floatingCartBottom} />
-      {collapseBrowseChrome ? <View pointerEvents="none" style={[styles.bottomSafeFill, { height: insets.bottom }]} /> : null}
+      <View pointerEvents="none" style={[styles.bottomSafeFill, styles.bottomSafeFillWhite, { height: Math.max(insets.bottom, 2) }]} />
       {openingAnimationVisible ? <View pointerEvents="none" style={styles.openingAnimationOverlay}>
         <View style={styles.openingSequenceGroup}>
           <View style={styles.openingRoute}>
@@ -1984,7 +1984,7 @@ const styles = StyleSheet.create({
   homeChromeGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 460, zIndex: 0 },
   homeChromeTransparent: { backgroundColor: 'transparent' },
   backRevealPage: { flex: 1 },
-  homeEntranceBackground: { backgroundColor: '#0A254A' },
+  homeEntranceBackground: { backgroundColor: '#FFFFFF' },
   loginEntrance: { flex: 1 },
   openingAnimationOverlay: { ...StyleSheet.absoluteFill, zIndex: 100, overflow: 'hidden', alignItems: 'center', backgroundColor: '#0A254A' },
   openingSequenceGroup: { position: 'absolute', top: '50%', left: 0, right: 0, marginTop: -87, height: 134, alignItems: 'center', justifyContent: 'center' },
@@ -2044,7 +2044,7 @@ const styles = StyleSheet.create({
   badgeText: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '700' },
   content: { paddingHorizontal: 0, paddingBottom: 72 },
   browseContent: { paddingBottom: 78, backgroundColor: palette.white },
-  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, paddingBottom: 8, backgroundColor: 'transparent' },
+  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, paddingBottom: 0, backgroundColor: 'transparent' },
   carouselFade: { minHeight: 229, marginTop: 8, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
   carouselLoading: { height: 218, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12345B' },
   carouselLoadingText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
@@ -2053,6 +2053,7 @@ const styles = StyleSheet.create({
   openingCartonIcon: { position: 'absolute', left: 0, top: 0 },
   zigzagPartition: { height: 24, marginTop: -8, marginHorizontal: 0, flexDirection: 'row', overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: palette.white },
   bottomSafeFill: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25, backgroundColor: '#F5F5F5' },
+  bottomSafeFillWhite: { backgroundColor: '#FFFFFF' },
   zigzagTooth: { display: 'none' },
   staticSearchZone: { paddingTop: 2, paddingBottom: 10, overflow: 'visible', backgroundColor: homeChrome, zIndex: 100, elevation: 20 },
   searchBox: { height: 52, marginHorizontal: 16, borderWidth: 0, borderRadius: 15, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: palette.white, shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 5 },
@@ -2219,7 +2220,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   productCard: { marginBottom: 15 },
   collectionProductCard: { marginBottom: 4, backgroundColor: '#FFFFFF' },
-  collectionProductVisual: { width: '100%', aspectRatio: 0.88, overflow: 'hidden', borderWidth: 1.25, borderBottomWidth: 0, borderColor: '#C9D3E1', borderTopLeftRadius: 9, borderTopRightRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  collectionProductVisual: { width: '100%', aspectRatio: 0.88, overflow: 'hidden', borderWidth: 1.25, borderColor: '#C9D3E1', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   collectionProductImage: { position: 'absolute', left: '5%', bottom: 4, width: '90%', height: '82%' },
   collectionUnavailable: { opacity: 0.45 },
   collectionDiscountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
@@ -2227,10 +2228,10 @@ const styles = StyleSheet.create({
   collectionComingSoon: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   collectionComingSoonText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   collectionHeart: { position: 'absolute', right: 4, top: 4, width: 28, height: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  collectionUnitRow: { height: 40, borderWidth: 1.25, borderTopWidth: 0, borderColor: '#C9D3E1', borderBottomLeftRadius: 9, borderBottomRightRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', backgroundColor: '#FFFFFF' },
-  collectionImageAction: { minWidth: 58, height: 40, marginRight: -1.25, marginBottom: -1.25, paddingHorizontal: 9, borderWidth: 1.25, borderColor: palette.blue, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  collectionImageActionText: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  collectionNotifyAction: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
+  collectionUnitRow: { position: 'relative', zIndex: 4, height: 34, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  collectionImageAction: { position: 'absolute', top: -22, right: 0, minWidth: 68, height: 48, paddingHorizontal: 12, borderWidth: 1.5, borderColor: palette.blue, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue, shadowColor: '#0A254A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 5, elevation: 5 },
+  collectionImageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
+  collectionNotifyAction: { minWidth: 78, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
   collectionNotifyText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
@@ -2241,7 +2242,7 @@ const styles = StyleSheet.create({
   collectionPrice: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   collectionSalePrice: { color: palette.heading },
   collectionOldPrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
-  collectionDiscountLine: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
+  collectionDiscountLine: { color: palette.red, fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
   productRow: { gap: 5 },
   productVisual: { height: 109, borderRadius: 6, backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border, justifyContent: 'center', alignItems: 'center' },
   productImage: { position: 'absolute', width: '80%', height: '88%' },
@@ -2250,7 +2251,7 @@ const styles = StyleSheet.create({
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   price: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 17, fontWeight: '800' },
   oldPrice: { fontFamily: 'Inter_400Regular', fontSize: 10, color: 'rgba(0,0,0,0.45)', textDecorationLine: 'line-through' },
-  discount: { fontFamily: 'Inter_400Regular', fontSize: 10, color: palette.green },
+  discount: { fontFamily: 'Inter_400Regular', fontSize: 10, color: palette.red },
   cartButton: { width: '88%', alignSelf: 'center', height: 30, borderRadius: 15, borderWidth: 1, borderColor: palette.blue, alignItems: 'center', justifyContent: 'center', marginTop: 7 },
   cartButtonText: { color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '800' },
   pressed: { opacity: 0.6 },
@@ -2373,7 +2374,7 @@ const styles = StyleSheet.create({
   wishlistPriceRow: { width: '100%', minHeight: 20, marginTop: 5, overflow: 'hidden', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'baseline', columnGap: 3 },
   wishlistPrice: { flexShrink: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   wishlistOldPrice: { flexShrink: 1, color: '#777777', fontFamily: 'Inter_400Regular', fontSize: 8, textDecorationLine: 'line-through' },
-  wishlistDiscount: { flexShrink: 1, color: palette.green, fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '800' },
+  wishlistDiscount: { flexShrink: 1, color: palette.red, fontFamily: 'Inter_400Regular', fontSize: 9, fontWeight: '800' },
   wishlistAddButton: { height: 38, marginTop: 9, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: palette.blue },
   wishlistNotifyButton: { backgroundColor: '#B98725' },
   wishlistAddText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },

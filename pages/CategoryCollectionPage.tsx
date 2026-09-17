@@ -185,7 +185,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                 <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
                   {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
                   {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : null}
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={21} color={favoriteIds.has(product.id) ? '#B85C5C' : '#2C2D2E'} /></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={21} color={favoriteIds.has(product.id) ? '#E53935' : '#2C2D2E'} /></Pressable>
                 </Pressable>
                 <View style={s.productActionDock}><Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable></View>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={s.price}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
@@ -287,7 +287,7 @@ const s = StyleSheet.create({
   collectionLoader: { height: 180, alignItems: 'center', justifyContent: 'center' },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
   productCard: { width: '48.2%', marginBottom: 4, backgroundColor: '#FFFFFF' },
-  productImageBlock: { width: '100%', aspectRatio: 0.88, overflow: 'hidden', borderWidth: 1.25, borderBottomWidth: 0, borderColor: '#C9D3E1', borderTopLeftRadius: 9, borderTopRightRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  productImageBlock: { width: '100%', aspectRatio: 0.88, overflow: 'hidden', borderWidth: 1.25, borderColor: '#C9D3E1', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   productImage: { position: 'absolute', left: '5%', bottom: 4, width: '90%', height: '82%' },
   unavailableImage: { opacity: 0.42 },
   unavailableDetails: { opacity: 0.48 },
@@ -295,10 +295,10 @@ const s = StyleSheet.create({
   discountBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   comingSoonBadge: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   comingSoonBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
-  productActionDock: { height: 40, borderWidth: 1.25, borderTopWidth: 0, borderColor: '#C9D3E1', borderBottomLeftRadius: 9, borderBottomRightRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', backgroundColor: '#FFFFFF' },
-  imageActionButton: { minWidth: 62, height: 40, marginRight: -1.25, marginBottom: -1.25, paddingHorizontal: 10, borderWidth: 1.25, borderColor: '#3F72E5', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  imageActionText: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
-  notifyButton: { borderColor: '#2E8B36', backgroundColor: '#FFFFFF' },
+  productActionDock: { position: 'relative', zIndex: 4, height: 34, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  imageActionButton: { position: 'absolute', top: -22, right: 0, minWidth: 68, height: 48, paddingHorizontal: 12, borderWidth: 1.5, borderColor: '#3F72E5', borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 5, elevation: 5 },
+  imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
+  notifyButton: { minWidth: 78, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
   notifyButtonText: { color: '#2E8B36' },
   notifyIconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   notifyTick: { position: 'absolute', top: -6, right: -8, width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
@@ -310,7 +310,7 @@ const s = StyleSheet.create({
   price: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   discountedPrice: { color: '#D83434' },
   comparePrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
-  discountLine: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
+  discountLine: { color: '#E53935', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
   empty: { width: '100%', marginTop: 50, color: '#777777', textAlign: 'center' },
   loadMoreButton: { alignSelf: 'center', minWidth: 140, height: 44, marginTop: 24, paddingHorizontal: 24, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E53935', shadowColor: '#7A1714', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 7 },
   loadMoreButtonDisabled: { opacity: 0.65 },
