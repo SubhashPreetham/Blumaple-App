@@ -523,13 +523,12 @@ function ProductDetail({ width, topInset, cartCount, cartQuantity, product, reco
 
   return <View style={[styles.detailPage, { width }]}>
     <Animated.ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={styles.detailContent} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: detailScrollY } } }], { useNativeDriver: true })}>
-      <View style={styles.detailHeroSection}>
+      <View style={[styles.detailHeroSection, { height: topInset + width + 42 }]}>
         <ScrollView ref={detailGalleryRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} style={styles.detailGallery} onMomentumScrollEnd={event => setColorIndex(Math.round(event.nativeEvent.contentOffset.x / width))}>
-          {choices.map((option, index) => <Image key={`hero-${option.name}-${index}`} source={option.image} style={[styles.detailHero, { width, height: Math.max(260, 360 - topInset - 62), marginTop: topInset + 58 }]} resizeMode="contain" />)}
+          {choices.map((option, index) => <View key={`hero-${option.name}-${index}`} style={[styles.detailHeroCard, { width: width - 24, height: width - 24, marginHorizontal: 12, marginTop: topInset + 42 }]}><Image source={option.image} style={styles.detailHero} resizeMode="contain" /></View>)}
         </ScrollView>
         <View style={styles.detailDots}>{choices.map((_, i) => <View key={i} style={[styles.detailDot, i === colorIndex && styles.detailDotActive]} />)}</View>
       </View>
-      {choices.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} style={styles.detailThumbnailScroller} contentContainerStyle={styles.detailThumbnails}>{choices.map((option, index) => <Pressable key={`${option.name}-${index}`} onPress={() => { setColorIndex(index); detailGalleryRef.current?.scrollTo({ x: index * width, animated: true }); }} style={[styles.detailThumbnail, index === colorIndex && styles.detailThumbnailActive]}><Image source={option.image} style={styles.swatchImage} resizeMode="contain" /></Pressable>)}</ScrollView> : null}
       <LinearGradient pointerEvents="none" colors={['#FFFFFF', '#F4F5FA']} style={styles.detailImageFade} />
       <View style={styles.detailInfoCard}>
         <Text style={styles.detailTitle}>{product.name}</Text>
@@ -2459,16 +2458,17 @@ const styles = StyleSheet.create({
   detailContent: { paddingBottom: 18 },
   detailHeroSection: { height: 360, backgroundColor: '#FFFFFF' },
   detailGallery: { width: '100%', backgroundColor: '#FFFFFF' },
-  detailHero: { width: '100%', height: '100%' },
+  detailHeroCard: { position: 'relative', overflow: 'hidden', borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  detailHero: { width: '100%', height: '100%', borderRadius: 24 },
   detailUnifiedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, paddingHorizontal: 12, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   detailUnifiedHeaderBackground: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#FFFFFF' },
   detailOverlayActions: { flexDirection: 'row', gap: 6 },
   detailCircleButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   detailCircleButtonBackground: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.95)', shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
   detailStickyTitle: { flex: 1, minWidth: 0, marginHorizontal: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '800' },
-  detailDots: { position: 'absolute', left: 0, right: 0, bottom: 10, height: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 },
-  detailDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(43,84,123,0.48)' },
-  detailDotActive: { backgroundColor: '#CC3438' },
+  detailDots: { position: 'absolute', left: 14, right: 14, bottom: 3, height: 10, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  detailDot: { flex: 1, height: 2, backgroundColor: '#D9DCE2' },
+  detailDotActive: { backgroundColor: palette.red },
   detailThumbnailScroller: { width: '100%', flexGrow: 0, backgroundColor: '#FFFFFF' },
   detailThumbnails: { minWidth: '100%', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFFFFF' },
   detailThumbnail: { width: 54, height: 54, borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 9, overflow: 'hidden', backgroundColor: '#FFFFFF' },
