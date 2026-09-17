@@ -138,6 +138,58 @@ const homeMenus = [
   { label: 'Industry', hero: require('./assets/figma/category-industry.png') },
 ] as const;
 
+type HomeHeroTheme = {
+  colors: readonly [string, string, string, string, string];
+  locations: readonly [number, number, number, number, number];
+};
+
+const HOME_HERO_THEMES: Record<string, HomeHeroTheme> = {
+  Audio: { colors: ['#071D3D', '#0C3159', '#1E5A86', '#72A8C8', '#DCEAF3'], locations: [0, 0.24, 0.49, 0.75, 1] },
+  Capture: { colors: ['#301712', '#592A20', '#8C503A', '#C58A68', '#F0D9C8'], locations: [0, 0.24, 0.49, 0.75, 1] },
+  Computers: { colors: ['#11182B', '#1E2F52', '#345A82', '#7796B2', '#D9E5EE'], locations: [0, 0.24, 0.49, 0.75, 1] },
+  'Smart Tech': { colors: ['#151537', '#27235D', '#435A91', '#7E9FC1', '#DCE8F1'], locations: [0, 0.24, 0.49, 0.75, 1] },
+  Home: { colors: ['#183227', '#2D5143', '#5D806D', '#9DB8A4', '#E3ECE4'], locations: [0, 0.24, 0.49, 0.75, 1] },
+  Lifestyle: { colors: ['#32172F', '#5A2D59', '#875B82', '#B793AF', '#EADDE8'], locations: [0, 0.24, 0.49, 0.75, 1] },
+  Industry: { colors: ['#282016', '#51412B', '#7A6746', '#AD9871', '#E8E0D0'], locations: [0, 0.24, 0.49, 0.75, 1] },
+};
+
+function getHomeHeroTheme(category: string): HomeHeroTheme {
+  if (HOME_HERO_THEMES[category]) return HOME_HERO_THEMES[category]!;
+  const normalized = category.toLowerCase();
+  if (normalized.includes('camera') || normalized.includes('capture')) return HOME_HERO_THEMES.Capture!;
+  if (normalized.includes('computer')) return HOME_HERO_THEMES.Computers!;
+  if (normalized.includes('smart') || normalized.includes('watch')) return HOME_HERO_THEMES['Smart Tech']!;
+  if (normalized.includes('home')) return HOME_HERO_THEMES.Home!;
+  if (normalized.includes('life')) return HOME_HERO_THEMES.Lifestyle!;
+  if (normalized.includes('industr')) return HOME_HERO_THEMES.Industry!;
+  return HOME_HERO_THEMES.Audio!;
+}
+
+function HomeHeroBackground({ category }: { category: string }) {
+  const incomingTheme = getHomeHeroTheme(category);
+  const [outgoingTheme, setOutgoingTheme] = useState(incomingTheme);
+  const [activeTheme, setActiveTheme] = useState(incomingTheme);
+  const activeThemeRef = useRef(incomingTheme);
+  const transition = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const nextTheme = getHomeHeroTheme(category);
+    setOutgoingTheme(activeThemeRef.current);
+    setActiveTheme(nextTheme);
+    activeThemeRef.current = nextTheme;
+    transition.stopAnimation();
+    transition.setValue(0);
+    const animation = Animated.timing(transition, { toValue: 1, duration: 480, easing: Easing.inOut(Easing.cubic), useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [category, transition]);
+
+  return <View pointerEvents="none" style={styles.homeChromeGradient}>
+    <LinearGradient colors={outgoingTheme.colors} locations={outgoingTheme.locations} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: transition }]}><LinearGradient colors={activeTheme.colors} locations={activeTheme.locations} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} /></Animated.View>
+  </View>;
+}
+
 const excludedShopifyMenuItems = new Set(['Express Hub', 'Blumaple Business', 'Track Your Order']);
 
 function money(amount: string, currencyCode: string) {
@@ -616,11 +668,14 @@ function Storefront() {
   const cardWidth = Math.max(156, (contentWidth - 46) / 2);
   const wishlistCardWidth = (contentWidth - 36) / 2;
   const trendingCardWidth = Math.max(118, (contentWidth - 54) / 2.65);
-  const carouselCardWidth = Math.round(contentWidth - 32);
+  const carouselCardWidth = Math.round(contentWidth - 72);
   const carouselStep = carouselCardWidth + 12;
   const [activeBanner, setActiveBanner] = useState(0);
   const [carouselCycle, setCarouselCycle] = useState(0);
   const [activeCategory, setActiveCategory] = useState('Audio');
+  const homeMenuRef = useRef<ScrollView>(null);
+  const homeMenuViewportWidthRef = useRef(0);
+  const homeMenuContentWidthRef = useRef(0);
   const [homeProductListing, setHomeProductListing] = useState<'trending' | 'bestSelling'>('trending');
   const [discoverySearchReturnScreen, setDiscoverySearchReturnScreen] = useState<ReturnScreen>('home');
   const [discoverySearchInitialQuery, setDiscoverySearchInitialQuery] = useState('');
@@ -770,7 +825,7 @@ function Storefront() {
   const browseViewportHeightRef = useRef(0);
   const browseChromeProgress = useRef(new Animated.Value(0)).current;
   const browseFooterProgress = useRef(new Animated.Value(0)).current;
-  const collapseBrowseChrome = screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders' || screen === 'profile';
+  const collapseBrowseChrome = screen === 'wishlist' || screen === 'orders' || screen === 'profile';
   const storefrontHeaderVisible = collapseBrowseChrome
     && screen !== 'profile'
     && !openingAnimationVisible
@@ -946,6 +1001,7 @@ function Storefront() {
     : [...homeMenus],
   [filteredShopifyMenuItems]);
   const activeHomeMenu = displayHomeMenus.find(menu => menu.label === activeCategory) ?? displayHomeMenus[0]!;
+  const activeHomeHeroTheme = getHomeHeroTheme(activeHomeMenu.label);
   const activeShopifyMenu = filteredShopifyMenuItems.find(item => item.title.trim() === activeHomeMenu.label);
   const categoryIndex = Math.max(0, displayHomeMenus.findIndex(menu => menu.label === activeHomeMenu.label));
   const shopCategories = useMemo(
@@ -1393,12 +1449,19 @@ function Storefront() {
 
   const openFooterPage = (target: 'home' | 'categories' | 'orders' | 'wishlist' | 'offers') => {
     if (screen === target || footerPageTransitioning) return;
-    setActiveFooterTab(target);
+    browseChromeProgress.stopAnimation();
+    browseFooterProgress.stopAnimation();
+    browseChromeCollapsedRef.current = false;
+    browseFooterCollapsedRef.current = false;
+    lastBrowseScrollYRef.current = 0;
+    browseContentHeightRef.current = 0;
+    browseViewportHeightRef.current = 0;
+    browseChromeProgress.setValue(0);
+    browseFooterProgress.setValue(0);
     setFooterPageTransitioning(true);
-    requestAnimationFrame(() => {
-      setScreen(target);
-      requestAnimationFrame(() => setFooterPageTransitioning(false));
-    });
+    setActiveFooterTab(target);
+    setScreen(target);
+    requestAnimationFrame(() => setFooterPageTransitioning(false));
   };
 
   const openDiscoverySearch = (origin: ReturnScreen = 'home', initialQuery = '') => {
@@ -1596,10 +1659,10 @@ function Storefront() {
   </SafeAreaView>;
 
   return (
-    <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea]}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} />
+    <SafeAreaView style={[styles.safeArea, (screen === 'home' || screen === 'categories' || screen === 'wishlist' || screen === 'offers' || screen === 'orders') && styles.homeSafeArea, screen === 'home' && { backgroundColor: activeHomeHeroTheme.colors[0] }]}>
+      <StatusBar barStyle="light-content" backgroundColor={screen === 'home' ? activeHomeHeroTheme.colors[0] : '#0A254A'} translucent={false} />
       <Animated.View style={[styles.app, activeFooterTab === 'home' && styles.homeEntranceBackground, { width: contentWidth, opacity: Animated.multiply(storefrontEntranceProgress, backRevealOpacity), transform: [{ translateX: backRevealTranslateX }] }]}>
-        {screen === 'home' ? <LinearGradient pointerEvents="none" colors={['#0A254A', '#17395F', '#41688D', '#91ABC4', '#F4F7FB']} locations={[0, 0.28, 0.52, 0.78, 1]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.homeChromeGradient} /> : null}
+        {screen === 'home' ? <HomeHeroBackground category={activeHomeMenu.label} /> : null}
         {collapseBrowseChrome ? <Animated.View style={[styles.homeCollapsibleHeader, { height: homeHeaderHeight, opacity: homeHeaderOpacity }]}>
           <View style={styles.deliveryHeader}>
           <View style={styles.deliveryBrandBlock}>
@@ -1620,17 +1683,23 @@ function Storefront() {
             <Image source={require('./images/blumaple-header-white.png')} style={styles.deliveryLogo} resizeMode="contain" />
             <Pressable onPress={openPincodeModal} style={styles.addAddressButton}><Ionicons name="location-outline" size={21} color={palette.blue} /><Text style={styles.addAddressText}>{deliveryPincode ? `Deliver to ${deliveryPincode}` : 'Deliver to'}</Text></Pressable>
           </View>
-          <View style={styles.deliveryActions}><Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="cart-outline" size={26} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open account" hitSlop={8} onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.headerActionButton}><Ionicons name={customerAuth.isLoggedIn ? 'person-circle' : 'person-circle-outline'} size={27} color={palette.white} /></Pressable></View>
+          <View style={styles.deliveryActions}>{screen === 'categories' || screen === 'offers' ? <Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch(screen)} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="cart-outline" size={26} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open account" hitSlop={8} onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.headerActionButton}><Ionicons name={customerAuth.isLoggedIn ? 'person-circle' : 'person-circle-outline'} size={27} color={palette.white} /></Pressable></View>
         </View>}
 
         {screen === 'home' ? <View style={styles.homeSearchZone}><Pressable accessibilityRole="search" accessibilityLabel="Search products" onPress={() => openDiscoverySearch('home', SEARCH_PLACEHOLDERS[searchPlaceholderIndex])} style={styles.homeSearchButton}><Ionicons name="search-outline" size={23} color={palette.ink} /><View style={styles.homeSearchTextClip}><Animated.View style={[styles.homeSearchTextStack, { transform: [{ translateY: searchPlaceholderY.interpolate({ inputRange: [0, 1], outputRange: [0, -24] }) }] }]}><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}&quot;</Text><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[(searchPlaceholderIndex + 1) % SEARCH_PLACEHOLDERS.length]}&quot;</Text></Animated.View></View><View style={styles.homeSearchDivider} /><Ionicons name="mic-outline" size={21} color={palette.ink} /></Pressable></View> : null}
 
-        {screen === 'home' ? <View style={styles.homePinnedMenu}><ScrollView horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="fast" snapToInterval={82} snapToAlignment="start" scrollEventThrottle={16} contentContainerStyle={styles.blinkTabs}>
+        {screen === 'home' ? <View style={styles.homePinnedMenu} onLayout={event => { homeMenuViewportWidthRef.current = event.nativeEvent.layout.width; }}><ScrollView ref={homeMenuRef} horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="fast" snapToInterval={82} snapToAlignment="start" disableIntervalMomentum scrollEventThrottle={16} onContentSizeChange={width => { homeMenuContentWidthRef.current = width; }} contentContainerStyle={styles.blinkTabs}>
           {displayHomeMenus.map((menu, index) => {
             const active = activeCategory === menu.label;
             const icon = menu.label === 'Audio' ? (active ? 'headset' : 'headset-outline') : menu.label === 'Capture' ? (active ? 'camera' : 'camera-outline') : menu.label === 'Computers' ? (active ? 'laptop' : 'laptop-outline') : menu.label === 'Smart Tech' ? (active ? 'watch' : 'watch-outline') : menu.label === 'Home' ? (active ? 'home' : 'home-outline') : menu.label === 'Lifestyle' ? (active ? 'sparkles' : 'sparkles-outline') : (active ? 'build' : 'build-outline');
-            return <Pressable key={menu.label} onPress={() => setActiveCategory(menu.label)} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, active && styles.blinkTabActive]}>
-              <View style={styles.blinkTabIconWrap}><Ionicons name={icon} size={25} color={active ? '#3F72E5' : '#FFFFFF'} />{active ? <View style={styles.blinkTabIconAccent} /> : null}</View>
+            return <Pressable key={menu.label} onPress={() => {
+              setActiveCategory(menu.label);
+              const viewportWidth = homeMenuViewportWidthRef.current;
+              const maximumOffset = Math.max(0, homeMenuContentWidthRef.current - viewportWidth);
+              const centeredOffset = index * 82 + 40 - viewportWidth / 2;
+              homeMenuRef.current?.scrollTo({ x: Math.max(0, Math.min(centeredOffset, maximumOffset)), animated: true });
+            }} style={[styles.blinkTab, index < displayHomeMenus.length - 1 && styles.blinkTabPartition, active && styles.blinkTabActive]}>
+              <View style={[styles.blinkTabIconWrap, active && styles.blinkTabIconWrapActive]}><Ionicons name={icon} size={active ? 22 : 25} color="#FFFFFF" />{active ? <View style={styles.blinkTabIconAccent} /> : null}</View>
               <Text style={[styles.blinkTabText, active && styles.blinkTabTextActive]}>{menu.label}</Text>
               {active ? <View style={styles.blinkTabIndicator} /> : null}
             </Pressable>;
@@ -1639,7 +1708,7 @@ function Storefront() {
 
         <Animated.ScrollView
           key={screen}
-          style={{ backgroundColor: palette.white }}
+          style={{ backgroundColor: screen === 'home' ? 'transparent' : palette.white }}
           showsVerticalScrollIndicator={false}
           bounces
           alwaysBounceVertical
@@ -1652,6 +1721,7 @@ function Storefront() {
             if (browseChromeCollapsedRef.current && height <= browseViewportHeightRef.current + 130) setBrowseChromeVisibility(false);
           }}
           onScroll={collapseBrowseChrome ? event => {
+            if (footerPageTransitioning) return;
             const offsetY = Math.max(0, event.nativeEvent.contentOffset.y);
             const previousOffsetY = lastBrowseScrollYRef.current;
             const movement = offsetY - previousOffsetY;
@@ -1666,7 +1736,7 @@ function Storefront() {
         >
           {screen === 'home' ? <>
           <Animated.View style={{ opacity: homeCarouselEntrance, transform: [{ translateY: homeCarouselTranslateY }] }}>
-          <View style={[styles.carouselHeaderZone, styles.homeContentSurface]}>
+          <View style={styles.carouselHeaderZone}>
           <View style={styles.carouselFade}>
           {carouselSlides.length ? <><ScrollView
             horizontal
@@ -1674,7 +1744,9 @@ function Storefront() {
             ref={carouselRef}
             contentOffset={{ x: carouselStep * (carouselSlideCount + (carouselSlideCount > 1 ? 1 : 0)), y: 0 }}
             snapToInterval={carouselStep}
-            decelerationRate="normal"
+            decelerationRate="fast"
+            snapToAlignment="start"
+            disableIntervalMomentum
             overScrollMode="never"
             onScrollBeginDrag={() => {
               carouselProgress.stopAnimation();
@@ -1704,7 +1776,7 @@ function Storefront() {
                 openProduct(slide.product);
               }
             }}>
-              <View style={styles.promoImageFrame}><Image source={slide.image} style={styles.promoImage} resizeMode="contain" /></View>
+              <View style={styles.promoImageFrame}><Image source={slide.image} style={styles.promoImage} resizeMode="cover" /></View>
               <View style={styles.promoCopy}><Text numberOfLines={2} style={styles.promoTitle}>{slide.title}</Text>{slide.subtitle ? <Text style={styles.promoSubtitle}>{slide.subtitle}</Text> : null}</View>
             </Pressable>)}
           </ScrollView>
@@ -1909,7 +1981,7 @@ const styles = StyleSheet.create({
   homeHeroSurface: { position: 'relative', overflow: 'hidden', backgroundColor: '#0A254A' },
   homeContentSurface: { position: 'relative', backgroundColor: '#FFFFFF' },
   app: { flex: 1, alignSelf: 'center', backgroundColor: palette.white },
-  homeChromeGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 221, zIndex: 0 },
+  homeChromeGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 460, zIndex: 0 },
   homeChromeTransparent: { backgroundColor: 'transparent' },
   backRevealPage: { flex: 1 },
   homeEntranceBackground: { backgroundColor: '#0A254A' },
@@ -1972,8 +2044,8 @@ const styles = StyleSheet.create({
   badgeText: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '700' },
   content: { paddingHorizontal: 0, paddingBottom: 72 },
   browseContent: { paddingBottom: 78, backgroundColor: palette.white },
-  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, paddingBottom: 8, backgroundColor: homeChrome },
-  carouselFade: { minHeight: 229, marginTop: 12, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
+  carouselHeaderZone: { marginHorizontal: 0, paddingHorizontal: 0, paddingBottom: 8, backgroundColor: 'transparent' },
+  carouselFade: { minHeight: 229, marginTop: 8, marginHorizontal: 0, paddingHorizontal: 0, backgroundColor: 'transparent' },
   carouselLoading: { height: 218, marginHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12345B' },
   carouselLoadingText: { color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
   cartonLoader: { width: 66, height: 58, alignItems: 'center', justifyContent: 'flex-end' },
@@ -2035,7 +2107,7 @@ const styles = StyleSheet.create({
   searchLoadMore: { width: 150, height: 44, marginTop: 20, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: palette.blue },
   searchLoadMoreDisabled: { opacity: 0.6 },
   searchLoadMoreText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  homePinnedMenu: { position: 'relative', flexShrink: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(92,108,126,0.24)', backgroundColor: 'transparent', zIndex: 15 },
+  homePinnedMenu: { position: 'relative', flexShrink: 0, borderBottomWidth: 0, backgroundColor: 'transparent', zIndex: 15 },
   homeSearchZone: { position: 'relative', paddingHorizontal: 15, paddingTop: 3, paddingBottom: 7, backgroundColor: 'transparent', zIndex: 15 },
   homeSearchButton: { height: 50, paddingHorizontal: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.09, shadowRadius: 6, elevation: 3 },
   homeSearchTextClip: { flex: 1, height: 24, overflow: 'hidden' },
@@ -2044,18 +2116,19 @@ const styles = StyleSheet.create({
   homeSearchDivider: { width: 1, height: 27, backgroundColor: '#E3E6EA' },
   blinkTabs: { gap: 2, paddingTop: 11, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent' },
   blinkTab: { position: 'relative', width: 80, height: 65, paddingHorizontal: 3, paddingTop: 7, paddingBottom: 10, gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  blinkTabIconWrap: { position: 'relative', width: 28, height: 27, alignItems: 'center', justifyContent: 'center' },
-  blinkTabIconAccent: { position: 'absolute', top: 0, right: 0, width: 7, height: 7, borderRadius: 4, borderWidth: 1, borderColor: '#0A254A', backgroundColor: '#D83434' },
+  blinkTabIconWrap: { position: 'relative', width: 32, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  blinkTabIconWrapActive: { backgroundColor: 'rgba(10,37,74,0.9)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.34)' },
+  blinkTabIconAccent: { position: 'absolute', top: -1, right: -1, width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#E53935' },
   blinkTabGradient: { ...StyleSheet.absoluteFill, borderRadius: 13 },
   blinkTabPartition: { borderRightWidth: 0 },
   blinkTabActive: { backgroundColor: 'transparent' },
   blinkTabIndicator: { position: 'absolute', left: 12, right: 12, bottom: -1, height: 4, borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: '#D83434' },
-  blinkTabText: { width: '100%', color: '#4D5968', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 12, fontWeight: '600', textAlign: 'center' },
-  blinkTabTextActive: { color: palette.blue, fontWeight: '900' },
+  blinkTabText: { width: '100%', color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 12, fontWeight: '700', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  blinkTabTextActive: { color: '#FFFFFF', fontWeight: '900' },
   promoCards: { gap: 12, paddingVertical: 5 },
-  promoCard: { height: 196, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', borderRadius: 20, overflow: 'hidden', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 5 },
-  promoImageFrame: { ...StyleSheet.absoluteFill, borderRadius: 19, overflow: 'hidden', backgroundColor: '#FFFFFF' },
-  promoImage: { width: '100%', height: '100%', transform: [{ scale: 1.08 }] },
+  promoCard: { height: 196, borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent' },
+  promoImageFrame: { ...StyleSheet.absoluteFill, borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent' },
+  promoImage: { width: '100%', height: '100%' },
   promoCopy: { position: 'absolute', left: 18, right: 14, bottom: 17 },
   promoTitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 19, lineHeight: 23, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   promoSubtitle: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, marginTop: 4, width: 140, textShadowColor: 'rgba(0,0,0,0.58)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
