@@ -55,7 +55,7 @@ const palette = {
   white: '#FFFFFF',
 };
 
-const SEARCH_PLACEHOLDERS = ['Wireless headphones', 'Bluetooth speakers', 'Smart watches', 'Digital cameras', 'Mobile cases', 'Gaming keyboards', 'Computer monitors', 'Power banks', 'USB accessories', 'System components'];
+const SEARCH_PLACEHOLDERS = ['Wireless headphones', 'Bluetooth speakers', 'Smart watches', 'Digital cameras', 'Mobile cases', 'Gaming keyboards', 'Computer monitors', 'USB accessories', 'System components'];
 const CAROUSEL_INTERVAL_MS = 3000;
 const CHECKOUT_ADDRESS_KEY = 'blumaple.checkout.address.v1';
 
@@ -451,18 +451,16 @@ function CollectionArtwork({ source }: { source?: ImageSourcePropType }) {
   </View>;
 }
 
-function ProductDetail({ width, cartCount, product, recommendations, favoriteIds, onBack, onAdd, onCheckout, onOpenProduct, onFavorite }: { width: number; cartCount: number; product: Product; recommendations: Product[]; favoriteIds: Set<string>; onBack: () => void; onAdd: (product: Product) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onFavorite: (product: Product) => void }) {
+function ProductDetail({ width, topInset, cartCount, cartQuantity, product, recommendations, favoriteIds, onBack, onSearch, onAdd, onChangeCartQuantity, onCheckout, onOpenProduct, onFavorite }: { width: number; topInset: number; cartCount: number; cartQuantity: number; product: Product; recommendations: Product[]; favoriteIds: Set<string>; onBack: () => void; onSearch: () => void; onAdd: (product: Product) => void; onChangeCartQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onFavorite: (product: Product) => void }) {
   const notifyConfirmation = useNotifyConfirmation();
   const [colorIndex, setColorIndex] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [shareVisible, setShareVisible] = useState(false);
+  const detailScrollY = useRef(new Animated.Value(0)).current;
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
-  const [reviews, setReviews] = useState<Array<{ id: string; name: string; rating: number; text: string }>>([
-    { id: 'verified-1', name: 'Verified customer', rating: 5, text: 'Excellent quality and secure packaging. The product matched the description.' },
-    { id: 'verified-2', name: 'Blumaple customer', rating: 4, text: 'Good product and helpful delivery updates throughout the order.' },
-  ]);
+  const [reviews, setReviews] = useState<Array<{ id: string; name: string; rating: number; text: string }>>([]);
   const detailGalleryRef = useRef<ScrollView>(null);
   const choices = product.images?.length ? product.images.map((image, index) => ({ name: index === 0 ? 'Default' : `View ${index + 1}`, image })) : [{ name: 'Default', image: product.image }];
   const availableForSale = product.availableForSale ?? true;
@@ -520,20 +518,19 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
     setReviewRating(0);
     setReviewText('');
   };
+  const stickyHeaderOpacity = detailScrollY.interpolate({ inputRange: [165, 225], outputRange: [0, 1], extrapolate: 'clamp' });
+  const headerCircleOpacity = detailScrollY.interpolate({ inputRange: [145, 210], outputRange: [1, 0], extrapolate: 'clamp' });
 
   return <View style={[styles.detailPage, { width }]}>
-    <ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={styles.detailContent}>
+    <Animated.ScrollView showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={styles.detailContent} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: detailScrollY } } }], { useNativeDriver: true })}>
       <View style={styles.detailHeroSection}>
         <ScrollView ref={detailGalleryRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} style={styles.detailGallery} onMomentumScrollEnd={event => setColorIndex(Math.round(event.nativeEvent.contentOffset.x / width))}>
-          {choices.map((option, index) => <Image key={`hero-${option.name}-${index}`} source={option.image} style={[styles.detailHero, { width }]} resizeMode="contain" />)}
+          {choices.map((option, index) => <Image key={`hero-${option.name}-${index}`} source={option.image} style={[styles.detailHero, { width, height: Math.max(260, 360 - topInset - 62), marginTop: topInset + 58 }]} resizeMode="contain" />)}
         </ScrollView>
-        <View style={styles.detailOverlayHeader}>
-          <Pressable onPress={onBack} style={styles.detailCircleButton}><Ionicons name="arrow-back" size={22} color={palette.ink} /></Pressable>
-          <View style={styles.detailOverlayActions}><Pressable onPress={() => onFavorite(product)} style={styles.detailCircleButton}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={22} color={favoriteIds.has(product.id) ? WISHLIST_ACTIVE_COLOR : palette.ink} /></Pressable><Pressable onPress={() => setShareVisible(true)} style={styles.detailCircleButton}><Ionicons name="share-social-outline" size={21} color={palette.ink} /></Pressable></View>
-        </View>
         <View style={styles.detailDots}>{choices.map((_, i) => <View key={i} style={[styles.detailDot, i === colorIndex && styles.detailDotActive]} />)}</View>
       </View>
       {choices.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} style={styles.detailThumbnailScroller} contentContainerStyle={styles.detailThumbnails}>{choices.map((option, index) => <Pressable key={`${option.name}-${index}`} onPress={() => { setColorIndex(index); detailGalleryRef.current?.scrollTo({ x: index * width, animated: true }); }} style={[styles.detailThumbnail, index === colorIndex && styles.detailThumbnailActive]}><Image source={option.image} style={styles.swatchImage} resizeMode="contain" /></Pressable>)}</ScrollView> : null}
+      <LinearGradient pointerEvents="none" colors={['#FFFFFF', '#F4F5FA']} style={styles.detailImageFade} />
       <View style={styles.detailInfoCard}>
         <Text style={styles.detailTitle}>{product.name}</Text>
         <View style={styles.detailPriceRow}><Text style={styles.detailPrice}>{product.price}</Text>{product.oldPrice ? <Text style={styles.detailOldPrice}>{product.oldPrice}</Text> : null}{detailDiscountLabel ? <Text style={styles.detailDiscount}>{detailDiscountLabel}</Text> : null}</View>
@@ -554,19 +551,18 @@ function ProductDetail({ width, cartCount, product, recommendations, favoriteIds
       </View>
       {rows.map(([title, copy]) => { const open = expanded === title; const specifications = title === 'Specifications & details'; return <Pressable key={title} onPress={() => setExpanded(open ? null : title)} style={styles.accordion}><View style={styles.accordionHeading}><Text style={styles.accordionTitle}>{title}</Text><Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} /></View>{open ? specifications ? <View style={styles.specTable}>{specificationRows.map(([heading, detail], index) => <View key={`${heading}-${index}`} style={[styles.specRow, index === specificationRows.length - 1 && styles.specRowLast]}><View style={styles.specHeadingCell}><Text style={styles.specHeadingText}>{heading}</Text></View><View style={styles.specDetailCell}><Text style={styles.specDetailText}>{detail}</Text></View></View>)}</View> : <Text style={styles.accordionCopy}>{copy}</Text> : null}</Pressable>; })}
       <View style={styles.reviewSection}>
-        <View style={styles.reviewHeadingRow}><View><Text style={styles.reviewHeading}>Ratings &amp; Reviews</Text><Text style={styles.reviewSummary}>{reviewAverage.toFixed(1)} ★ · {reviews.length} reviews</Text></View><Ionicons name="chatbox-ellipses-outline" size={25} color={palette.blue} /></View>
+        <View style={styles.reviewHeadingRow}><View><Text style={styles.reviewHeading}>Ratings &amp; Reviews</Text><Text style={styles.reviewSummary}>{reviews.length ? `${reviewAverage.toFixed(1)} ★ · ${reviews.length} ${reviews.length === 1 ? 'review' : 'reviews'}` : 'No reviews yet'}</Text></View><Ionicons name="chatbox-ellipses-outline" size={25} color={palette.blue} /></View>
         <Text style={styles.reviewPrompt}>Rate this product</Text>
         <View style={styles.reviewStars}>{[1, 2, 3, 4, 5].map(star => <Pressable key={star} onPress={() => setReviewRating(star)} hitSlop={5}><Ionicons name={star <= reviewRating ? 'star' : 'star-outline'} size={28} color="#F2A900" /></Pressable>)}</View>
         <TextInput value={reviewText} onChangeText={setReviewText} multiline textAlignVertical="top" placeholder="Write your review" placeholderTextColor="#8B929D" style={styles.reviewInput} />
         <Pressable onPress={submitReview} style={styles.reviewSubmit}><Text style={styles.reviewSubmitText}>Submit review</Text></Pressable>
-        <Text style={styles.reviewListHeading}>Customer reviews</Text>
-        {reviews.map(review => <View key={review.id} style={styles.productReviewCard}><View style={styles.reviewCardHeader}><Text style={styles.reviewName}>{review.name}</Text><Text style={styles.reviewCardRating}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</Text></View><Text style={styles.reviewBody}>{review.text}</Text></View>)}
       </View>
       <Text style={styles.similarTitle}>You may also like</Text>
       <Text style={styles.similarSubtitle}>Combine your style with these products</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces alwaysBounceHorizontal directionalLockEnabled decelerationRate="normal" scrollEventThrottle={16} contentContainerStyle={styles.detailRecommendations}>{recommendations.filter(item => item.id !== product.id).slice(0, 12).map(item => <ProductCard key={`similar-${item.id}`} item={item} width={150} favorite={favoriteIds.has(item.id)} collectionLayout onFavorite={() => onFavorite(item)} onAdd={() => onAdd(item)} onOpen={() => onOpenProduct(item)} />)}</ScrollView>
-    </ScrollView>
-    <View style={styles.buyBar}><Pressable onPress={availableForSale ? () => onAdd(product) : notifyConfirmation.notify} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}>{availableForSale ? <Text style={styles.addLargeText}>Add to cart</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#FFFFFF" />}</Pressable><Pressable disabled={!availableForSale} onPress={onCheckout} style={[styles.footerBuyNow, !availableForSale && styles.footerBuyNowDisabled]}><Text style={styles.footerBuyNowText}>Buy it now</Text></Pressable></View>
+    </Animated.ScrollView>
+    <View style={[styles.detailUnifiedHeader, { height: 62 + topInset, paddingTop: topInset + 10 }]}><Animated.View pointerEvents="none" style={[styles.detailUnifiedHeaderBackground, { opacity: stickyHeaderOpacity }]} /><Pressable onPress={onBack} style={styles.detailCircleButton}><Animated.View pointerEvents="none" style={[styles.detailCircleButtonBackground, { opacity: headerCircleOpacity }]} /><Ionicons name="chevron-down" size={22} color={palette.ink} /></Pressable><Animated.Text numberOfLines={1} style={[styles.detailStickyTitle, { opacity: stickyHeaderOpacity }]}>{product.name}</Animated.Text><View style={styles.detailOverlayActions}><Pressable onPress={() => onFavorite(product)} style={styles.detailCircleButton}><Animated.View pointerEvents="none" style={[styles.detailCircleButtonBackground, { opacity: headerCircleOpacity }]} /><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={20} color={favoriteIds.has(product.id) ? WISHLIST_ACTIVE_COLOR : palette.ink} /></Pressable><Pressable onPress={onSearch} style={styles.detailCircleButton}><Animated.View pointerEvents="none" style={[styles.detailCircleButtonBackground, { opacity: headerCircleOpacity }]} /><Ionicons name="search-outline" size={21} color={palette.ink} /></Pressable><Pressable onPress={() => setShareVisible(true)} style={styles.detailCircleButton}><Animated.View pointerEvents="none" style={[styles.detailCircleButtonBackground, { opacity: headerCircleOpacity }]} /><Ionicons name="share-outline" size={21} color={palette.ink} /></Pressable></View></View>
+    <View style={styles.buyBarContainer}><LinearGradient pointerEvents="none" colors={['rgba(7,17,31,0)', 'rgba(7,17,31,0.15)']} style={styles.buyBarShadow} /><View style={styles.buyBar}><View style={styles.buyBarSummary}><Text style={styles.buyBarPrice}>{floatingTotal}</Text>{product.oldPrice ? <Text numberOfLines={1} style={styles.buyBarOldPrice}>{product.oldPrice}</Text> : null}<Text style={styles.buyBarTax}>Inclusive of all taxes</Text></View>{availableForSale && cartQuantity > 0 ? <View style={styles.detailCartQuantity}><Pressable accessibilityLabel="Decrease quantity" hitSlop={8} onPress={() => onChangeCartQuantity(product.id, -1)} style={styles.detailCartQuantityAction}><Ionicons name="remove" size={22} color="#FFFFFF" /></Pressable><Text style={styles.detailCartQuantityValue}>{cartQuantity}</Text><Pressable accessibilityLabel="Increase quantity" hitSlop={8} onPress={() => onChangeCartQuantity(product.id, 1)} style={styles.detailCartQuantityAction}><Ionicons name="add" size={22} color="#FFFFFF" /></Pressable></View> : <Pressable onPress={availableForSale ? () => onAdd(product) : notifyConfirmation.notify} style={[styles.addLarge, !availableForSale && styles.notifyLarge]}>{availableForSale ? <Text style={styles.addLargeText}>Add to cart</Text> : <NotifyConfirmation notified={notifyConfirmation.notified} showMessage={notifyConfirmation.showMessage} color="#FFFFFF" />}</Pressable>}</View></View>
     <Modal visible={shareVisible} transparent animationType="slide" onRequestClose={() => setShareVisible(false)}>
       <Pressable style={styles.shareBackdrop} onPress={() => setShareVisible(false)}><Pressable style={styles.shareSheet} onPress={() => {}}>
         <View style={styles.shareSheetHeader}><Text style={styles.shareSheetTitle}>Share product</Text><Pressable onPress={() => setShareVisible(false)}><Ionicons name="close" size={23} color={palette.ink} /></Pressable></View>
@@ -1603,7 +1599,7 @@ function Storefront() {
 
   if (screen === 'product' && selectedProduct) {
     const recommendations = productPageRecommendations;
-    return <SafeAreaView style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDetail key={selectedProduct.id} width={contentWidth} cartCount={cartCount} product={selectedProduct} recommendations={recommendations} favoriteIds={favorites} onBack={() => navigateBack(productReturnScreen)} onAdd={addToCart} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); }} onOpenProduct={openProduct} onFavorite={toggleFavorite} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}<HelpFab product={selectedProduct} cartBottom={floatingCartBottom} /></Animated.View></SafeAreaView>;
+    return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}><StatusBar barStyle="dark-content" backgroundColor="transparent" translucent /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><ProductDetail key={selectedProduct.id} width={contentWidth} topInset={insets.top} cartCount={cartCount} cartQuantity={cartItems.find(item => item.product.id === selectedProduct.id)?.quantity ?? 0} product={selectedProduct} recommendations={recommendations} favoriteIds={favorites} onBack={() => navigateBack(productReturnScreen)} onSearch={() => openDiscoverySearch('product')} onAdd={addToCart} onChangeCartQuantity={changeCartQuantity} onCheckout={() => { setCartItems(current => current.length ? current : [{ product: selectedProduct, quantity: 1 }]); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); }} onOpenProduct={openProduct} onFavorite={toggleFavorite} />{cartPopupVisible ? <CartPopup item={cartPreview} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} /> : null}<HelpFab product={selectedProduct} cartBottom={floatingCartBottom} /></Animated.View></SafeAreaView>;
   }
 
   if (screen === 'cart') {
@@ -1682,7 +1678,7 @@ function Storefront() {
           <View style={styles.deliveryActions}>{screen === 'categories' || screen === 'offers' ? <Pressable accessibilityRole="button" accessibilityLabel="Open search" hitSlop={8} onPress={() => openDiscoverySearch(screen)} style={styles.headerActionButton}><Ionicons name="search-outline" size={25} color={palette.white} /></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel={`Open cart${cartCount ? `, ${cartCount} items` : ''}`} hitSlop={10} onPress={openCart} style={styles.headerCartButton}><Ionicons name="cart-outline" size={26} color={palette.white} />{cartCount > 0 ? <View style={styles.headerCartBadge}><Text style={styles.headerCartBadgeText}>{cartCount > 99 ? '99+' : cartCount}</Text></View> : null}</Pressable><Pressable accessibilityRole="button" accessibilityLabel="Open account" hitSlop={8} onPress={() => customerAuth.isLoggedIn ? openProfile() : setInitialLoginSkipped(false)} style={styles.headerActionButton}><Ionicons name={customerAuth.isLoggedIn ? 'person-circle' : 'person-circle-outline'} size={27} color={palette.white} /></Pressable></View>
         </View>}
 
-        {screen === 'home' ? <View style={styles.homeSearchZone}><Pressable accessibilityRole="search" accessibilityLabel="Search products" onPress={() => openDiscoverySearch('home', SEARCH_PLACEHOLDERS[searchPlaceholderIndex])} style={styles.homeSearchButton}><Ionicons name="search-outline" size={23} color={palette.ink} /><View style={styles.homeSearchTextClip}><Animated.View style={[styles.homeSearchTextStack, { transform: [{ translateY: searchPlaceholderY.interpolate({ inputRange: [0, 1], outputRange: [0, -24] }) }] }]}><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}&quot;</Text><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[(searchPlaceholderIndex + 1) % SEARCH_PLACEHOLDERS.length]}&quot;</Text></Animated.View></View><View style={styles.homeSearchDivider} /><Ionicons name="mic-outline" size={21} color={palette.ink} /></Pressable></View> : null}
+        {screen === 'home' ? <View style={styles.homeSearchZone}><Pressable accessibilityRole="search" accessibilityLabel="Search products" onPress={() => openDiscoverySearch('home', SEARCH_PLACEHOLDERS[searchPlaceholderIndex])} style={styles.homeSearchButton}><Ionicons name="search-outline" size={23} color={palette.ink} /><View style={styles.homeSearchTextClip}><Animated.View style={[styles.homeSearchTextStack, { transform: [{ translateY: searchPlaceholderY.interpolate({ inputRange: [0, 1], outputRange: [0, -24] }) }] }]}><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[searchPlaceholderIndex]}&quot;</Text><Text numberOfLines={1} style={styles.homeSearchButtonText}>Search &quot;{SEARCH_PLACEHOLDERS[(searchPlaceholderIndex + 1) % SEARCH_PLACEHOLDERS.length]}&quot;</Text></Animated.View></View></Pressable></View> : null}
 
         {screen === 'home' ? <View style={styles.homePinnedMenu} onLayout={event => { homeMenuViewportWidthRef.current = event.nativeEvent.layout.width; }}><ScrollView ref={homeMenuRef} horizontal showsHorizontalScrollIndicator={false} directionalLockEnabled nestedScrollEnabled decelerationRate="fast" snapToInterval={82} snapToAlignment="start" disableIntervalMomentum scrollEventThrottle={16} onContentSizeChange={width => { homeMenuContentWidthRef.current = width; }} contentContainerStyle={styles.blinkTabs}>
           {displayHomeMenus.map((menu, index) => {
@@ -2110,7 +2106,6 @@ const styles = StyleSheet.create({
   homeSearchTextClip: { flex: 1, height: 24, overflow: 'hidden' },
   homeSearchTextStack: { height: 48 },
   homeSearchButtonText: { height: 24, lineHeight: 24, color: '#697586', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '600' },
-  homeSearchDivider: { width: 1, height: 27, backgroundColor: '#E3E6EA' },
   blinkTabs: { gap: 2, paddingTop: 11, paddingHorizontal: 0, alignItems: 'center', backgroundColor: 'transparent' },
   blinkTab: { position: 'relative', width: 80, height: 65, paddingHorizontal: 3, paddingTop: 7, paddingBottom: 10, gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   blinkTabIconWrap: { position: 'relative', width: 32, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
@@ -2461,13 +2456,16 @@ const styles = StyleSheet.create({
   offersFooterBadge: { alignSelf: 'stretch', height: 60, alignItems: 'center', justifyContent: 'center' },
   offersFooterImage: { width: 42, height: 42, shadowColor: '#075EAD', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.22, shadowRadius: 4, elevation: 4 },
   detailPage: { flex: 1, alignSelf: 'center', backgroundColor: '#F4F5FA' },
-  detailContent: { paddingBottom: 0 },
-  detailHeroSection: { height: 310, backgroundColor: '#FFFFFF' },
+  detailContent: { paddingBottom: 18 },
+  detailHeroSection: { height: 360, backgroundColor: '#FFFFFF' },
   detailGallery: { width: '100%', backgroundColor: '#FFFFFF' },
   detailHero: { width: '100%', height: '100%' },
-  detailOverlayHeader: { position: 'absolute', top: 10, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  detailOverlayActions: { flexDirection: 'row', gap: 7 },
-  detailCircleButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.94)', shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
+  detailUnifiedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, paddingHorizontal: 12, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailUnifiedHeaderBackground: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: '#FFFFFF' },
+  detailOverlayActions: { flexDirection: 'row', gap: 6 },
+  detailCircleButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  detailCircleButtonBackground: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.95)', shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.12, shadowRadius: 3, elevation: 2 },
+  detailStickyTitle: { flex: 1, minWidth: 0, marginHorizontal: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '800' },
   detailDots: { position: 'absolute', left: 0, right: 0, bottom: 10, height: 20, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4 },
   detailDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(43,84,123,0.48)' },
   detailDotActive: { backgroundColor: '#CC3438' },
@@ -2476,7 +2474,8 @@ const styles = StyleSheet.create({
   detailThumbnail: { width: 54, height: 54, borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 9, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   detailThumbnailActive: { borderWidth: 2, borderColor: palette.blue },
   swatchImage: { width: '100%', height: '100%' },
-  detailInfoCard: { marginHorizontal: 12, marginTop: 8, padding: 13, borderRadius: 14, backgroundColor: '#FFFFFF' },
+  detailImageFade: { width: '100%', height: 16 },
+  detailInfoCard: { marginHorizontal: 12, marginTop: 0, padding: 13, borderRadius: 14, backgroundColor: '#FFFFFF' },
   detailTitle: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 20, lineHeight: 26, fontWeight: '900' },
   detailPriceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 7, marginTop: 7 },
   detailPrice: { color: '#D83434', fontFamily: 'Inter_400Regular', fontSize: 25, fontWeight: '900' },
@@ -2533,10 +2532,17 @@ const styles = StyleSheet.create({
   similarTitle: { marginHorizontal: 14, marginTop: 24, fontFamily: 'Inter_400Regular', fontSize: 20, fontWeight: '900' },
   similarSubtitle: { marginHorizontal: 14, marginTop: 4, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 12 },
   detailRecommendations: { gap: 12, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 0 },
-  buyBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F5F5', borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3' },
-  buyBarPrice: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
-  buyBarTax: { marginTop: 2, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 10 },
-  addLarge: { flex: 1, height: 46, borderRadius: 10, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  buyBarContainer: { position: 'relative', zIndex: 30, height: 76, backgroundColor: '#FFFFFF' },
+  buyBarShadow: { position: 'absolute', left: 0, right: 0, top: -8, height: 8 },
+  buyBar: { height: 76, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', shadowColor: '#07111F', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.19, shadowRadius: 6, elevation: 9 },
+  buyBarSummary: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
+  buyBarPrice: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
+  buyBarOldPrice: { flexShrink: 1, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
+  buyBarTax: { width: '100%', marginTop: 1, color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 10 },
+  addLarge: { width: '44%', height: 48, borderRadius: 10, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
+  detailCartQuantity: { width: '44%', height: 48, borderRadius: 10, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: palette.blue },
+  detailCartQuantityAction: { width: 38, height: 42, alignItems: 'center', justifyContent: 'center' },
+  detailCartQuantityValue: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
   footerBuyNow: { flex: 1, height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C2D2E' },
   footerBuyNowDisabled: { opacity: 0.45 },
   footerBuyNowText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
