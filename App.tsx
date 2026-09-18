@@ -666,10 +666,11 @@ function HelpFab({ product, cartBottom = 0 }: { product?: Product | null; cartBo
   </View>;
 }
 
-function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout, onOpenProduct, onAdd }: { items: CartItem[]; recentlyViewed: Product[]; onBack: () => void; onChangeQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onAdd: (product: Product) => void }) {
+function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout, onOpenProduct, onAdd, onSeeAll }: { items: CartItem[]; recentlyViewed: Product[]; onBack: () => void; onChangeQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onAdd: (product: Product) => void; onSeeAll: () => void }) {
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = items.reduce((total, { product, quantity }) => total + (product.unitPrice ?? (Number(product.price.replace(/[^0-9.]/g, '')) || 0)) * quantity, 0);
   const cartTotalText = money(String(cartTotal), items[0]?.product.currencyCode ?? 'INR');
+  const suggestionCardWidth = Math.max(96, (Math.min(Dimensions.get('window').width, 440) - 48) / 3);
   return <View style={styles.cartPage}>
     <View style={styles.cartPageHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.cartBackButton}><Ionicons name="arrow-back" size={23} color={palette.white} /></Pressable><Text style={styles.cartPageTitle}>My Cart</Text></View>
     {items.length ? <ScrollView contentContainerStyle={styles.cartList} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">{items.map(({ product, quantity }) => <View key={product.id} style={styles.cartListItem}>
@@ -677,7 +678,7 @@ function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout,
       <View style={styles.cartListCopy}><Text numberOfLines={3} style={styles.cartListName}>{product.name}</Text><Text style={styles.cartListPrice}>{product.price}</Text></View>
       <View style={styles.cartListActions}><View style={styles.cartQuantityControl}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, -1)}><Text style={styles.cartQuantityButton}>−</Text></Pressable><Text style={styles.cartQuantityValue}>{quantity}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, 1)}><Text style={styles.cartQuantityButton}>+</Text></Pressable></View></View>
       <Text numberOfLines={1} style={styles.cartLineTotal}>{product.unitPrice ? money(String(product.unitPrice * quantity), product.currencyCode ?? 'INR') : product.price}</Text>
-    </View>)}{recentlyViewed.length ? <View style={styles.cartSuggestions}><Text style={styles.cartSuggestionsTitle}>Suggestions</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cartSuggestionRow}>{recentlyViewed.map(product => <View key={product.id} style={styles.cartSuggestionCard}><Pressable onPress={() => onOpenProduct(product)}><Image source={product.image} style={styles.cartSuggestionImage} resizeMode="contain" /><Text numberOfLines={2} style={styles.cartSuggestionName}>{product.name}</Text><Text style={styles.cartSuggestionPrice}>{product.price}</Text></Pressable><Pressable onPress={() => onAdd(product)} style={styles.cartSuggestionAdd}><Text style={styles.cartSuggestionAddText}>ADD</Text></Pressable></View>)}</ScrollView></View> : null}</ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
+    </View>)}{recentlyViewed.length ? <View style={styles.cartSuggestions}><Text style={styles.cartSuggestionsTitle}>You might also like</Text><View style={styles.cartSuggestionGrid}>{recentlyViewed.slice(0, 9).map(product => <ProductCard key={`cart-suggestion-${product.id}`} item={product} width={suggestionCardWidth} favorite={false} quantity={items.find(item => item.product.id === product.id)?.quantity ?? 0} collectionLayout showFavorite={false} onFavorite={() => {}} onAdd={() => onAdd(product)} onChangeQuantity={change => onChangeQuantity(product.id, change)} onOpen={() => onOpenProduct(product)} />)}</View><Pressable onPress={onSeeAll} style={({ pressed }) => [styles.homeViewAllButton, styles.cartSeeAllButton, pressed && styles.pressed]}><View style={styles.homeViewAllThumbs}>{recentlyViewed.slice(0, 3).map((product, index) => <Image key={`cart-see-all-${product.id}`} source={product.image} style={[styles.homeViewAllThumb, index > 0 && styles.homeViewAllThumbOverlap]} resizeMode="contain" />)}</View><Text style={styles.homeViewAllText}>See all products</Text><Ionicons name="chevron-forward" size={16} color={palette.blue} /></Pressable></View> : null}</ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
     {items.length ? <View style={styles.cartCheckoutBar}><View style={styles.cartTotalBlock}><Text style={styles.cartItemCount}>{itemCount} {itemCount === 1 ? 'item' : 'items'} in cart</Text><Text style={styles.cartTotalText}>Total: {cartTotalText}</Text></View><Pressable onPress={onCheckout} style={styles.cartCheckoutButton}><Text style={styles.cartCheckoutText}>Proceed to checkout</Text></Pressable></View> : null}
   </View>;
 }
@@ -1650,7 +1651,7 @@ function Storefront() {
       seenSuggestionIds.add(product.id);
       return true;
     }).slice(0, 16);
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} /></Animated.View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} onSeeAll={() => { setHomeProductListing('bestSelling'); setScreen('homeProducts'); }} /></Animated.View></SafeAreaView>;
   }
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
@@ -2469,7 +2470,7 @@ const styles = StyleSheet.create({
   helpEnquiry: { height: 106, paddingTop: 12 },
   helpSubmit: { height: 48, marginTop: 2, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
   helpSubmitText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '900' },
-  cartPage: { flex: 1, backgroundColor: '#F5F5F5' },
+  cartPage: { flex: 1, backgroundColor: '#FFFFFF' },
   cartPageHeader: { height: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: '#0A254A', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#294565' },
   cartBackButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
   cartPageTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 21, fontWeight: '900' },
@@ -2486,6 +2487,8 @@ const styles = StyleSheet.create({
   cartLineTotal: { position: 'absolute', right: 9, bottom: 9, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, lineHeight: 22, fontWeight: '900' },
   cartSuggestions: { marginTop: 8 },
   cartSuggestionsTitle: { marginBottom: 10, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
+  cartSuggestionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
+  cartSeeAllButton: { marginTop: 18, marginHorizontal: 0 },
   cartSuggestionRow: { gap: 10, paddingRight: 4 },
   cartSuggestionCard: { width: 118, padding: 8, borderRadius: 10, backgroundColor: '#FFFFFF' },
   cartSuggestionImage: { width: '100%', height: 88, borderRadius: 7, backgroundColor: '#FFFFFF' },
