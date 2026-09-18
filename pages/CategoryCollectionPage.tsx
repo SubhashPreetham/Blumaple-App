@@ -17,6 +17,7 @@ type Props = {
   loadingMore: boolean;
   hasNextPage: boolean;
   favoriteIds: Set<string>;
+  cartQuantities: Record<string, number>;
   cartCount: number;
   onOpenSearch: () => void;
   onOpenWishlist: () => void;
@@ -26,6 +27,7 @@ type Props = {
   onLoadMore: () => void;
   onApplyFilters: (brands: string[], vendors: string[]) => void;
   onAdd: (product: ShopifyProduct) => void;
+  onChangeQuantity: (product: ShopifyProduct, change: number) => void;
   onToggleFavorite: (product: ShopifyProduct) => void;
   onOpenProduct: (product: ShopifyProduct) => void;
 };
@@ -56,7 +58,7 @@ function CollectionCartonLoader() {
   return <View style={s.collectionLoader} accessibilityLabel="Loading products"><View style={{ width: 46, height: 46 }}><Animated.View style={{ position: 'absolute', opacity: closed }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View><Animated.View style={{ position: 'absolute', opacity: open, transform: [{ translateY: lift }] }}><MaterialCommunityIcons name="package-variant" size={46} color="#B97435" /></Animated.View></View></View>;
 }
 
-export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, cartCount, onOpenSearch, onOpenWishlist, onOpenCart, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onToggleFavorite, onOpenProduct }: Props) {
+export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, cartQuantities, cartCount, onOpenSearch, onOpenWishlist, onOpenCart, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onChangeQuantity, onToggleFavorite, onOpenProduct }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('Recommended');
   const toast = useNotificationToast();
   const [filterVisible, setFilterVisible] = useState(false);
@@ -186,7 +188,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
                   {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : null}
                   <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={21} color={favoriteIds.has(product.id) ? '#E53935' : '#2C2D2E'} /></Pressable>
                 </Pressable>
-                <View style={s.productActionDock}><Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton, !availableForSale && notifiedIds.has(product.id) && s.notifiedButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable></View>
+                <View style={s.productActionDock}>{availableForSale && (cartQuantities[product.id] ?? 0) > 0 ? <View style={[s.imageActionButton, s.quantityAction]}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product, -1)} style={s.quantityTap}><Ionicons name="remove" size={13} color="#FFFFFF" /></Pressable><Text style={s.quantityText}>{cartQuantities[product.id]}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product, 1)} style={s.quantityTap}><Ionicons name="add" size={13} color="#FFFFFF" /></Pressable></View> : <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton, !availableForSale && notifiedIds.has(product.id) && s.notifiedButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>}</View>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={s.price}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
                 {hasDiscount ? <Text style={s.discountLine}>{discountPercent}% OFF</Text> : null}
                 <Text numberOfLines={3} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
@@ -295,6 +297,9 @@ const s = StyleSheet.create({
   comingSoonBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   productActionDock: { position: 'relative', zIndex: 4, height: 30, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
   imageActionButton: { position: 'absolute', top: -18, right: 0, minWidth: 58, height: 40, paddingHorizontal: 10, borderWidth: 1.5, borderColor: '#3F72E5', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 4, elevation: 4 },
+  quantityAction: { width: 58, minWidth: 58, paddingHorizontal: 2, flexDirection: 'row', justifyContent: 'space-between' },
+  quantityTap: { minWidth: 17, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  quantityText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
   notifyButton: { minWidth: 68, borderColor: '#2E8B36', backgroundColor: '#FFFFFF', shadowColor: '#1F6D2C' },
   notifiedButton: { minWidth: 40, width: 40, paddingHorizontal: 0, borderRadius: 9 },
