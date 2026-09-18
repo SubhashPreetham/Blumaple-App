@@ -568,7 +568,7 @@ function ProductDetail({ width, topInset, cartCount, cartQuantity, cartItems, pr
   </View>;
 }
 
-function CartPopup({ visible, item, items, count, onOpen, containerStyle }: { visible: boolean; item: Product | null; items: CartItem[]; count: number; onOpen: () => void; containerStyle?: any }) {
+function CartPopup({ visible, item, items, count, onOpen, containerStyle, footerProgress }: { visible: boolean; item: Product | null; items: CartItem[]; count: number; onOpen: () => void; containerStyle?: any; footerProgress?: Animated.Value }) {
   const [mounted, setMounted] = useState(visible);
   const [displayCount, setDisplayCount] = useState(count);
   const [displayProducts, setDisplayProducts] = useState<Product[]>(() => items.slice(-2).reverse().map(entry => entry.product));
@@ -601,7 +601,7 @@ function CartPopup({ visible, item, items, count, onOpen, containerStyle }: { vi
     }).start();
   }, [items.length, popupWidth]);
   if (!mounted) return null;
-  return <Animated.View pointerEvents={visible ? 'box-none' : 'none'} style={[styles.cartPopupLayer, containerStyle, { opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }] }]}><Animated.View style={{ width: popupWidth }}><Pressable onPress={onOpen} style={styles.cartPopup}>
+  return <Animated.View pointerEvents={visible ? 'box-none' : 'none'} style={[styles.cartPopupLayer, containerStyle, { opacity: progress, transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }, { translateY: footerProgress ? footerProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 70] }) : 0 }, { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }] }]}><Animated.View style={{ width: popupWidth }}><Pressable onPress={onOpen} style={styles.cartPopup}>
     <Animated.View style={[styles.cartPopupImages, { opacity: imageProgress, transform: [{ translateX: imageProgress.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }] }]}>{displayProducts.map((product, index) => <Image key={product.id} source={product.image} style={[styles.cartPopupImage, index > 0 && styles.cartPopupImageOverlap]} resizeMode="contain" />)}</Animated.View>
     <View style={styles.cartPopupCopy}><Text style={styles.cartPopupTitle}>View cart</Text><Text style={styles.cartPopupCount}>{displayCount} {displayCount === 1 ? 'item' : 'items'}</Text></View>
     <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
@@ -666,19 +666,19 @@ function HelpFab({ product, cartBottom = 0 }: { product?: Product | null; cartBo
   </View>;
 }
 
-function CartPage({ items, recentlyViewed, onBack, onChangeQuantity, onCheckout, onOpenProduct, onAdd, onSeeAll }: { items: CartItem[]; recentlyViewed: Product[]; onBack: () => void; onChangeQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onAdd: (product: Product) => void; onSeeAll: () => void }) {
+function CartPage({ items, recentlyViewed, wishlistProducts, favoriteIds, onBack, onSearch, onChangeQuantity, onCheckout, onOpenProduct, onAdd, onSeeAll, onOpenWishlist, onToggleFavorite }: { items: CartItem[]; recentlyViewed: Product[]; wishlistProducts: Product[]; favoriteIds: Set<string>; onBack: () => void; onSearch: () => void; onChangeQuantity: (productId: string, change: number) => void; onCheckout: () => void; onOpenProduct: (product: Product) => void; onAdd: (product: Product) => void; onSeeAll: () => void; onOpenWishlist: () => void; onToggleFavorite: (product: Product) => void }) {
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = items.reduce((total, { product, quantity }) => total + (product.unitPrice ?? (Number(product.price.replace(/[^0-9.]/g, '')) || 0)) * quantity, 0);
   const cartTotalText = money(String(cartTotal), items[0]?.product.currencyCode ?? 'INR');
-  const suggestionCardWidth = Math.max(96, (Math.min(Dimensions.get('window').width, 440) - 48) / 3);
+  const suggestionCardWidth = Math.max(92, (Math.min(Dimensions.get('window').width, 440) - 58) / 3);
   return <View style={styles.cartPage}>
-    <View style={styles.cartPageHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.cartBackButton}><Ionicons name="arrow-back" size={23} color={palette.white} /></Pressable><Text style={styles.cartPageTitle}>My Cart</Text></View>
-    {items.length ? <ScrollView contentContainerStyle={styles.cartList} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto">{items.map(({ product, quantity }) => <View key={product.id} style={styles.cartListItem}>
+    <View style={styles.cartPageHeader}><Pressable onPress={onBack} hitSlop={10} style={styles.cartBackButton}><Ionicons name="arrow-back" size={20} color={palette.heading} /></Pressable><Text style={styles.cartPageTitle}>My Cart</Text><View style={styles.cartHeaderActions}><Pressable accessibilityLabel="Search products" onPress={onSearch} style={styles.cartHeaderSearch}><Ionicons name="search-outline" size={20} color={palette.heading} /></Pressable><Pressable accessibilityLabel="Share cart" onPress={() => Share.share({ title: 'My Blumaple cart', message: `My Blumaple cart has ${itemCount} ${itemCount === 1 ? 'item' : 'items'}. Shop at https://blumaple.com` })} style={styles.cartHeaderShare}><Ionicons name="paper-plane-outline" size={16} color={palette.heading} /><Text style={styles.cartHeaderShareText}>Share</Text></Pressable></View></View>
+    {items.length ? <ScrollView contentContainerStyle={styles.cartList} showsVerticalScrollIndicator={false} bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto"><View style={styles.cartItemsBlock}><View style={styles.cartDeliveryHeading}><View style={styles.cartDeliveryIcon}><Ionicons name="checkmark-circle-outline" size={22} color="#2E8B36" /></View><View><View style={styles.cartShippingHighlight}><Text style={styles.cartShippingHighlightText}>FREE SHIPPING</Text></View><Text style={styles.cartDeliveryCopy}>Shipment of {itemCount} {itemCount === 1 ? 'item' : 'items'}</Text></View></View>{items.map(({ product, quantity }, index) => <View key={product.id} style={[styles.cartListItem, styles.cartBlockItem, index > 0 && styles.cartBlockItemDivider]}>
       <Image source={product.image} style={styles.cartListImage} resizeMode="contain" />
-      <View style={styles.cartListCopy}><Text numberOfLines={3} style={styles.cartListName}>{product.name}</Text><Text style={styles.cartListPrice}>{product.price}</Text></View>
+      <View style={styles.cartListCopy}><Text numberOfLines={2} style={styles.cartListName}>{product.name}</Text>{product.brand || product.vendor ? <Text numberOfLines={1} style={styles.cartListMeta}>{product.brand || product.vendor}</Text> : null}<Pressable onPress={() => onToggleFavorite(product)} hitSlop={6}><Text style={styles.cartMoveWishlist}>{favoriteIds.has(product.id) ? 'Saved to wishlist' : 'Move to wishlist'}</Text></Pressable></View>
       <View style={styles.cartListActions}><View style={styles.cartQuantityControl}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, -1)}><Text style={styles.cartQuantityButton}>−</Text></Pressable><Text style={styles.cartQuantityValue}>{quantity}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product.id, 1)}><Text style={styles.cartQuantityButton}>+</Text></Pressable></View></View>
-      <Text numberOfLines={1} style={styles.cartLineTotal}>{product.unitPrice ? money(String(product.unitPrice * quantity), product.currencyCode ?? 'INR') : product.price}</Text>
-    </View>)}{recentlyViewed.length ? <View style={styles.cartSuggestions}><Text style={styles.cartSuggestionsTitle}>You might also like</Text><View style={styles.cartSuggestionGrid}>{recentlyViewed.slice(0, 9).map(product => <ProductCard key={`cart-suggestion-${product.id}`} item={product} width={suggestionCardWidth} favorite={false} quantity={items.find(item => item.product.id === product.id)?.quantity ?? 0} collectionLayout showFavorite={false} onFavorite={() => {}} onAdd={() => onAdd(product)} onChangeQuantity={change => onChangeQuantity(product.id, change)} onOpen={() => onOpenProduct(product)} />)}</View><Pressable onPress={onSeeAll} style={({ pressed }) => [styles.homeViewAllButton, styles.cartSeeAllButton, pressed && styles.pressed]}><View style={styles.homeViewAllThumbs}>{recentlyViewed.slice(0, 3).map((product, index) => <Image key={`cart-see-all-${product.id}`} source={product.image} style={[styles.homeViewAllThumb, index > 0 && styles.homeViewAllThumbOverlap]} resizeMode="contain" />)}</View><Text style={styles.homeViewAllText}>See all products</Text><Ionicons name="chevron-forward" size={16} color={palette.blue} /></Pressable></View> : null}</ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
+      <View style={styles.cartLinePriceRow}>{product.oldPrice ? <Text numberOfLines={1} style={styles.cartLineOldPrice}>{product.oldPrice}</Text> : null}<Text numberOfLines={1} style={styles.cartLineTotal}>{product.unitPrice ? money(String(product.unitPrice * quantity), product.currencyCode ?? 'INR') : product.price}</Text></View>
+    </View>)}</View>{recentlyViewed.length ? <View style={[styles.cartSuggestions, styles.cartContentBlock]}><Text style={styles.cartSuggestionsTitle}>You might also like</Text><View style={styles.cartSuggestionGrid}>{recentlyViewed.slice(0, 9).map(product => <ProductCard key={`cart-suggestion-${product.id}`} item={product} width={suggestionCardWidth} favorite={favoriteIds.has(product.id)} quantity={items.find(item => item.product.id === product.id)?.quantity ?? 0} collectionLayout onFavorite={() => onToggleFavorite(product)} onAdd={() => onAdd(product)} onChangeQuantity={change => onChangeQuantity(product.id, change)} onOpen={() => onOpenProduct(product)} />)}</View><Pressable onPress={onSeeAll} style={({ pressed }) => [styles.homeViewAllButton, styles.cartSeeAllButton, pressed && styles.pressed]}><View style={styles.homeViewAllThumbs}>{recentlyViewed.slice(0, 3).map((product, index) => <Image key={`cart-see-all-${product.id}`} source={product.image} style={[styles.homeViewAllThumb, index > 0 && styles.homeViewAllThumbOverlap]} resizeMode="contain" />)}</View><Text style={styles.homeViewAllText}>See all products</Text><Ionicons name="chevron-forward" size={16} color={palette.blue} /></Pressable></View> : null}{wishlistProducts.length ? <View style={[styles.cartWishlistBlock, styles.cartContentBlock]}><View style={styles.cartBlockHeader}><Text style={[styles.cartSuggestionsTitle, styles.cartBlockHeaderTitle]}>Your Wishlist</Text><Pressable onPress={onOpenWishlist} hitSlop={8}><Text style={styles.cartWishlistViewAll}>View all</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cartWishlistRow}>{wishlistProducts.slice(0, 8).map(product => <ProductCard key={`cart-wishlist-${product.id}`} item={product} width={140} favorite quantity={items.find(item => item.product.id === product.id)?.quantity ?? 0} collectionLayout onFavorite={() => onToggleFavorite(product)} onAdd={() => onAdd(product)} onChangeQuantity={change => onChangeQuantity(product.id, change)} onOpen={() => onOpenProduct(product)} />)}</ScrollView></View> : null}<View style={[styles.cartOrderDetails, styles.cartContentBlock]}><Text style={styles.cartOrderDetailsTitle}>Order details</Text><View style={styles.cartOrderRow}><Text style={styles.cartOrderLabel}>Item total</Text><Text style={styles.cartOrderValue}>{cartTotalText}</Text></View><View style={styles.cartOrderRow}><Text style={styles.cartOrderLabel}>Shipping</Text><Text style={styles.cartOrderFree}>FREE</Text></View><View style={styles.cartOrderDivider} /><View style={styles.cartOrderRow}><Text style={styles.cartOrderTotalLabel}>Total payable</Text><Text style={styles.cartOrderTotalValue}>{cartTotalText}</Text></View></View></ScrollView> : <View style={styles.emptyCart}><Ionicons name="bag-handle-outline" size={44} color={palette.blue} /><Text style={styles.emptyCartTitle}>Your cart is empty</Text><Text style={styles.emptyCartCopy}>Add products to see them here.</Text></View>}
     {items.length ? <View style={styles.cartCheckoutBar}><View style={styles.cartTotalBlock}><Text style={styles.cartItemCount}>{itemCount} {itemCount === 1 ? 'item' : 'items'} in cart</Text><Text style={styles.cartTotalText}>Total: {cartTotalText}</Text></View><Pressable onPress={onCheckout} style={styles.cartCheckoutButton}><Text style={styles.cartCheckoutText}>Proceed to checkout</Text></Pressable></View> : null}
   </View>;
 }
@@ -1651,7 +1651,7 @@ function Storefront() {
       seenSuggestionIds.add(product.id);
       return true;
     }).slice(0, 16);
-    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CartPage items={cartItems} recentlyViewed={cartSuggestions} onBack={returnFromCart} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} onSeeAll={() => { setHomeProductListing('bestSelling'); setScreen('homeProducts'); }} /></Animated.View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#FFFFFF' }]}><StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} /><Animated.View style={[styles.backRevealPage, { opacity: backRevealOpacity, transform: [{ translateX: backRevealTranslateX }] }]}><CartPage items={cartItems} recentlyViewed={cartSuggestions} wishlistProducts={wishlistProducts} favoriteIds={favorites} onBack={returnFromCart} onSearch={() => openDiscoverySearch('cart')} onChangeQuantity={changeCartQuantity} onCheckout={() => { if (cartItems[0]) { setSelectedProduct(cartItems[0].product); setCheckoutInitialStage(2); if (customerAuth.isLoggedIn) setScreen('address'); else setCheckoutLoginRequired(true); } }} onOpenProduct={product => openProduct(product)} onAdd={addToCart} onSeeAll={() => { setHomeProductListing('bestSelling'); setScreen('homeProducts'); }} onOpenWishlist={() => openFooterPage('wishlist')} onToggleFavorite={toggleFavorite} /></Animated.View></SafeAreaView>;
   }
 
   if ((screen === 'orderSuccess' || screen === 'orderFailure') && orderOutcome) return <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0A254A' }]}><StatusBar barStyle="light-content" backgroundColor="#0A254A" translucent={false} /><OrderResultPage success={orderOutcome.success} orderId={orderOutcome.orderId} items={orderOutcome.items} address={shippingAddress} paymentMethod={orderOutcome.paymentMethod} total={orderOutcome.total} tax={orderOutcome.tax} codFee={orderOutcome.codFee} onHome={() => setScreen('home')} onRetry={() => setScreen('checkout')} /></SafeAreaView>;
@@ -1991,7 +1991,7 @@ function Storefront() {
           </View>
         </View>
       </Modal>
-      <CartPopup visible={cartPopupVisible && cartCount > 0} item={cartPreview} items={cartItems} count={cartCount} onOpen={openCart} containerStyle={{ paddingBottom: floatingCartBottom }} />
+      <CartPopup visible={cartPopupVisible && cartCount > 0} item={cartPreview} items={cartItems} count={cartCount} onOpen={openCart} footerProgress={browseFooterProgress} containerStyle={{ paddingBottom: floatingCartBottom }} />
       <HelpFab cartBottom={floatingCartBottom} />
       <View pointerEvents="none" style={[styles.bottomSafeFill, styles.bottomSafeFillWhite, { height: Math.max(insets.bottom, 2) }]} />
       {openingAnimationVisible ? <View pointerEvents="none" style={styles.openingAnimationOverlay}>
@@ -2285,10 +2285,10 @@ const styles = StyleSheet.create({
   notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   collectionProductName: { minHeight: 51, marginTop: 2, color: palette.ink, fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   collectionPriceRow: { minHeight: 22, marginTop: 4, flexDirection: 'row', alignItems: 'baseline', columnGap: 4, overflow: 'hidden' },
-  collectionPrice: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
+  collectionPrice: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '800' },
   collectionSalePrice: { color: palette.heading },
   collectionOldPrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
-  collectionDiscountLine: { color: palette.red, fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
+  collectionDiscountLine: { color: palette.red, fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '800' },
   productRow: { gap: 5 },
   productVisual: { height: 109, borderRadius: 6, backgroundColor: palette.white, borderWidth: 1, borderColor: palette.border, justifyContent: 'center', alignItems: 'center' },
   productImage: { position: 'absolute', width: '80%', height: '88%' },
@@ -2470,25 +2470,55 @@ const styles = StyleSheet.create({
   helpEnquiry: { height: 106, paddingTop: 12 },
   helpSubmit: { height: 48, marginTop: 2, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2E8B36' },
   helpSubmitText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 15, fontWeight: '900' },
-  cartPage: { flex: 1, backgroundColor: '#FFFFFF' },
-  cartPageHeader: { height: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: '#0A254A', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#294565' },
-  cartBackButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
-  cartPageTitle: { color: palette.white, fontFamily: 'Inter_400Regular', fontSize: 21, fontWeight: '900' },
+  cartPage: { flex: 1, backgroundColor: '#F6F7FA' },
+  cartPageHeader: { height: 72, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderColor: '#E4E7EC' },
+  cartBackButton: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: '#E3E6EA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  cartPageTitle: { flex: 1, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '700' },
+  cartHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  cartHeaderSearch: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: '#E3E6EA', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  cartHeaderShare: { height: 36, paddingHorizontal: 10, borderRadius: 18, borderWidth: 1, borderColor: '#E3E6EA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#FFFFFF' },
+  cartHeaderShareText: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '700' },
   cartList: { padding: 12, gap: 12, paddingBottom: 112 },
+  cartItemsBlock: { overflow: 'hidden', borderWidth: 1, borderColor: '#E7EAF0', borderRadius: 16, backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  cartDeliveryHeading: { minHeight: 72, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: '#EEF0F3' },
+  cartDeliveryIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2F8F2' },
+  cartShippingHighlight: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 6, backgroundColor: '#EAF7ED' },
+  cartShippingHighlightText: { color: '#238636', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800', letterSpacing: 0.35 },
+  cartDeliveryCopy: { marginTop: 3, color: palette.muted, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '600' },
   cartListItem: { minHeight: 116, padding: 9, borderRadius: 12, flexDirection: 'row', position: 'relative', backgroundColor: '#FFFFFF', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 5, elevation: 2 },
+  cartBlockItem: { borderRadius: 0, shadowOpacity: 0, elevation: 0 },
+  cartBlockItemDivider: { borderTopWidth: 1, borderTopColor: '#EEF0F3' },
   cartListImage: { width: 76, height: 98, borderRadius: 8, backgroundColor: '#FFFFFF' },
   cartListCopy: { flex: 1, marginLeft: 10, paddingVertical: 2 },
-  cartListName: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 18, fontWeight: '800' },
-  cartListPrice: { marginTop: 1, color: '#D83434', fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 19, fontWeight: '900' },
+  cartListName: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  cartListMeta: { marginTop: 4, color: '#697386', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '600' },
+  cartMoveWishlist: { marginTop: 5, color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   cartListActions: { width: 82, alignItems: 'flex-end', paddingVertical: 2 },
   cartQuantityControl: { width: 74, height: 32, borderRadius: 8, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2E8B36' },
   cartQuantityButton: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 18, lineHeight: 21, fontWeight: '600' },
-  cartQuantityValue: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '900' },
-  cartLineTotal: { position: 'absolute', right: 9, bottom: 9, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 18, lineHeight: 22, fontWeight: '900' },
+  cartQuantityValue: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '800' },
+  cartLinePriceRow: { position: 'absolute', right: 9, bottom: 9, flexDirection: 'row', alignItems: 'baseline', gap: 5 },
+  cartLineOldPrice: { maxWidth: 70, color: '#7A8088', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
+  cartLineTotal: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, lineHeight: 21, fontWeight: '800' },
   cartSuggestions: { marginTop: 8 },
-  cartSuggestionsTitle: { marginBottom: 10, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '900' },
-  cartSuggestionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
+  cartContentBlock: { padding: 12, borderWidth: 1, borderColor: '#E7EAF0', borderRadius: 16, backgroundColor: '#FFFFFF' },
+  cartSuggestionsTitle: { marginBottom: 10, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 19, fontWeight: '800' },
+  cartSuggestionGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 16 },
   cartSeeAllButton: { marginTop: 18, marginHorizontal: 0 },
+  cartWishlistBlock: { marginTop: 0 },
+  cartBlockHeader: { marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cartBlockHeaderTitle: { marginBottom: 0 },
+  cartWishlistViewAll: { color: palette.blue, fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
+  cartWishlistRow: { gap: 12, paddingRight: 4 },
+  cartOrderDetails: { marginTop: 0 },
+  cartOrderDetailsTitle: { marginBottom: 14, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '800' },
+  cartOrderRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cartOrderLabel: { color: '#667085', fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '600' },
+  cartOrderValue: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 13, fontWeight: '700' },
+  cartOrderFree: { color: '#238636', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '800' },
+  cartOrderDivider: { height: 1, marginVertical: 8, backgroundColor: '#E8EBEF' },
+  cartOrderTotalLabel: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '700' },
+  cartOrderTotalValue: { color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '800' },
   cartSuggestionRow: { gap: 10, paddingRight: 4 },
   cartSuggestionCard: { width: 118, padding: 8, borderRadius: 10, backgroundColor: '#FFFFFF' },
   cartSuggestionImage: { width: '100%', height: 88, borderRadius: 7, backgroundColor: '#FFFFFF' },
@@ -2502,9 +2532,9 @@ const styles = StyleSheet.create({
   cartCheckoutBar: { height: 70, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#D5DBE3', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF' },
   cartTotalBlock: { flex: 1 },
   cartItemCount: { color: '#697386', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '700' },
-  cartTotalText: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '900' },
+  cartTotalText: { marginTop: 2, color: palette.heading, fontFamily: 'Inter_400Regular', fontSize: 17, fontWeight: '800' },
   cartCheckoutButton: { height: 46, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.blue },
-  cartCheckoutText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '900' },
+  cartCheckoutText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 14, fontWeight: '800' },
   footerTab: { flex: 1, alignSelf: 'stretch', borderTopWidth: 3, borderTopColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF' },
   footerTabSelected: { borderTopColor: palette.blue, backgroundColor: '#FFFFFF' },
   footerTabText: { fontFamily: 'Inter_400Regular', fontSize: 10, color: '#555', fontWeight: '500' },
