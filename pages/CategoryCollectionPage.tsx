@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { ShopifyCollectionPreview, ShopifyMenuItem, ShopifyProduct } from '../src/shopify';
 import { useNotificationToast } from '../src/NotificationToast';
 
@@ -29,8 +29,13 @@ type Props = {
   onAdd: (product: ShopifyProduct) => void;
   onChangeQuantity: (product: ShopifyProduct, change: number) => void;
   onToggleFavorite: (product: ShopifyProduct) => void;
-  onOpenProduct: (product: ShopifyProduct) => void;
+  onOpenProduct: (product: ShopifyProduct, origin?: ProductTransitionOrigin) => void;
+  initialScrollOffset?: number;
+  onScrollOffsetChange?: (offset: number) => void;
+  onScrollRestored?: () => void;
 };
+
+type ProductTransitionOrigin = { x: number; y: number; width: number; height: number };
 
 type SortMode = 'Recommended' | 'Price: Low' | 'Price: High' | 'Name';
 const sortOptions: Array<{ label: string; value: SortMode }> = [
@@ -40,25 +45,31 @@ const sortOptions: Array<{ label: string; value: SortMode }> = [
   { label: 'Name', value: 'Name' },
 ];
 
-function CollectionCartonLoader() {
-  const progress = useRef(new Animated.Value(0)).current;
-  const closed = progress.interpolate({ inputRange: [0, .42, .58, 1], outputRange: [1, 1, 0, 0] });
-  const open = progress.interpolate({ inputRange: [0, .42, .58, 1], outputRange: [0, 0, 1, 1] });
-  const lift = progress.interpolate({ inputRange: [0, 1], outputRange: [2, -5] });
+function CollectionSkeletonLoader() {
+  const opacity = useRef(new Animated.Value(0.42)).current;
 
   useEffect(() => {
     const animation = Animated.loop(Animated.sequence([
-      Animated.timing(progress, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }), Animated.delay(260),
-      Animated.timing(progress, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }), Animated.delay(220),
+      Animated.timing(opacity, { toValue: 0.9, duration: 680, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.42, duration: 680, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
     ]));
     animation.start();
     return () => animation.stop();
-  }, [progress]);
+  }, [opacity]);
 
-  return <View style={s.collectionLoader} accessibilityLabel="Loading products"><View style={{ width: 46, height: 46 }}><Animated.View style={{ position: 'absolute', opacity: closed }}><MaterialCommunityIcons name="package-variant-closed" size={46} color="#B97435" /></Animated.View><Animated.View style={{ position: 'absolute', opacity: open, transform: [{ translateY: lift }] }}><MaterialCommunityIcons name="package-variant" size={46} color="#B97435" /></Animated.View></View></View>;
+  return <View style={s.collectionLoader} accessibilityLabel="Loading products">
+    {[0, 1, 2, 3, 4, 5].map(item => <View key={item} style={s.skeletonCard}>
+      <Animated.View style={[s.skeletonImage, { opacity }]} />
+      <View style={s.skeletonDetails}>
+        <Animated.View style={[s.skeletonPrice, { opacity }]} />
+        <Animated.View style={[s.skeletonTitle, { opacity }]} />
+        <Animated.View style={[s.skeletonTitle, s.skeletonTitleShort, { opacity }]} />
+      </View>
+    </View>)}
+  </View>;
 }
 
-export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, cartQuantities, cartCount, onOpenSearch, onOpenWishlist, onOpenCart, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onChangeQuantity, onToggleFavorite, onOpenProduct }: Props) {
+export function CategoryCollectionPage({ category, selectedCollection, previews, products, brands, shippingOptions, filterDataLoading, loading, totalProducts, loadingMore, hasNextPage, favoriteIds, cartQuantities, cartCount, onOpenSearch, onOpenWishlist, onOpenCart, onBack, onSelectCollection, onLoadMore, onApplyFilters, onAdd, onChangeQuantity, onToggleFavorite, onOpenProduct, initialScrollOffset = 0, onScrollOffsetChange, onScrollRestored }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('Recommended');
   const toast = useNotificationToast();
   const [filterVisible, setFilterVisible] = useState(false);
@@ -71,6 +82,10 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
   const [notifiedIds, setNotifiedIds] = useState<Set<string>>(new Set());
   const [notifyMessageId, setNotifyMessageId] = useState<string | null>(null);
   const notifyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const productVisualRefs = useRef<Record<string, View | null>>({});
+  const productScrollRef = useRef<ScrollView>(null);
+  const hasRestoredScrollRef = useRef(false);
+  const lastProductScrollOffsetRef = useRef(initialScrollOffset);
   useEffect(() => {
     setShowProductScrollHint(true);
     setSelectedBrands(new Set());
@@ -78,6 +93,18 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
     setAppliedBrands(new Set());
     setAppliedShipping(new Set());
   }, [selectedCollection.id]);
+
+  const restoreProductScroll = () => {
+    if (hasRestoredScrollRef.current) return;
+    hasRestoredScrollRef.current = true;
+    requestAnimationFrame(() => {
+      if (initialScrollOffset > 0) productScrollRef.current?.scrollTo({ y: initialScrollOffset, animated: false });
+      onScrollRestored?.();
+    });
+  };
+
+  const saveProductScrollPosition = () => onScrollOffsetChange?.(lastProductScrollOffsetRef.current);
+  const scrollFurther = () => productScrollRef.current?.scrollTo({ y: lastProductScrollOffsetRef.current + 280, animated: true });
 
   useEffect(() => () => {
     if (notifyTimer.current) clearTimeout(notifyTimer.current);
@@ -172,8 +199,8 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
           <Pressable onPress={() => setFilterVisible(true)} style={[s.control, activeFilterCount > 0 && s.controlActive]}><Ionicons name="options-outline" size={16} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /><Text style={[s.controlText, activeFilterCount > 0 && s.controlTextActive]}>Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text><Ionicons name="chevron-down" size={14} color={activeFilterCount > 0 ? '#FFFFFF' : '#2C2D2E'} /></Pressable>
           <Pressable onPress={() => setSortVisible(true)} style={[s.control, s.sortControl]}><Ionicons name="swap-vertical" size={16} color="#2C2D2E" /><Text numberOfLines={1} style={s.controlText}>Sort</Text><Ionicons name="chevron-down" size={14} color="#2C2D2E" /></Pressable>
         </View>
-        <ScrollView showsVerticalScrollIndicator persistentScrollbar indicatorStyle="black" bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll} onScroll={event => { const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent; setShowProductScrollHint(contentOffset.y + layoutMeasurement.height < contentSize.height - 24); }}>
-          {loading ? <CollectionCartonLoader /> : <View style={s.productGrid}>
+        <ScrollView ref={productScrollRef} showsVerticalScrollIndicator persistentScrollbar indicatorStyle="black" bounces alwaysBounceVertical decelerationRate="normal" scrollEventThrottle={16} overScrollMode="auto" contentContainerStyle={s.productScroll} onContentSizeChange={restoreProductScroll} onLayout={restoreProductScroll} onScrollEndDrag={saveProductScrollPosition} onMomentumScrollEnd={saveProductScrollPosition} onScroll={event => { const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent; lastProductScrollOffsetRef.current = contentOffset.y; const shouldShowHint = contentOffset.y + layoutMeasurement.height < contentSize.height - 24; setShowProductScrollHint(current => current === shouldShowHint ? current : shouldShowHint); }}>
+          {loading ? <CollectionSkeletonLoader /> : <View style={s.productGrid}>
             {visibleProducts.map(product => {
               const variant = product.variants.nodes[0];
               const imageUrl = product.images.nodes[0]?.url;
@@ -183,15 +210,15 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
               const discountPercent = hasDiscount ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100) : 0;
               const availableForSale = variant?.availableForSale ?? false;
               return <View key={product.id} style={s.productCard}>
-                <Pressable onPress={() => onOpenProduct(product)} style={s.productImageBlock}>
+                <Pressable ref={node => { productVisualRefs.current[product.id] = node; }} onPress={() => productVisualRefs.current[product.id]?.measureInWindow((x, y, width, height) => onOpenProduct(product, width && height ? { x, y, width, height } : undefined))} style={s.productImageBlock}>
                   {imageUrl ? <Image source={{ uri: imageUrl }} style={[s.productImage, !availableForSale && s.unavailableImage]} resizeMode="contain" /> : <Ionicons name="image-outline" size={32} color="#8D9AAF" />}
+                  {hasDiscount ? <View style={s.discountBadge}><Text style={s.discountBadgeText}>{discountPercent}% OFF</Text></View> : null}
                   {!availableForSale ? <View style={s.comingSoonBadge}><Text style={s.comingSoonBadgeText}>Coming soon</Text></View> : null}
                   <Pressable accessibilityRole="button" accessibilityLabel={`Favorite ${product.title}`} hitSlop={10} onPress={() => onToggleFavorite(product)} style={s.heart}><Ionicons name={favoriteIds.has(product.id) ? 'heart' : 'heart-outline'} size={21} color={favoriteIds.has(product.id) ? '#E53935' : '#2C2D2E'} /></Pressable>
                 </Pressable>
                 <View style={s.productActionDock}>{availableForSale && (cartQuantities[product.id] ?? 0) > 0 ? <View style={[s.imageActionButton, s.quantityAction]}><Pressable hitSlop={8} onPress={() => onChangeQuantity(product, -1)} style={s.quantityTap}><Ionicons name="remove" size={13} color="#FFFFFF" /></Pressable><Text style={s.quantityText}>{cartQuantities[product.id]}</Text><Pressable hitSlop={8} onPress={() => onChangeQuantity(product, 1)} style={s.quantityTap}><Ionicons name="add" size={13} color="#FFFFFF" /></Pressable></View> : <Pressable onPress={availableForSale ? () => onAdd(product) : () => requestNotification(product.id)} style={[s.imageActionButton, !availableForSale && s.notifyButton, !availableForSale && notifiedIds.has(product.id) && s.notifiedButton]}>{availableForSale ? <Text style={s.imageActionText}>ADD</Text> : notifiedIds.has(product.id) ? <View style={s.notifyIconWrap}><Ionicons name="notifications" size={18} color="#2E8B36" /><View style={s.notifyTick}><Ionicons name="checkmark" size={10} color="#FFFFFF" /></View></View> : <Text style={s.notifyButtonText}>NOTIFY</Text>}</Pressable>}</View>
                 <View style={[s.priceRow, !availableForSale && s.unavailableDetails]}><Text style={s.price}>{variant ? `₹${price.toLocaleString('en-IN')}` : 'Unavailable'}</Text>{hasDiscount ? <Text numberOfLines={1} style={s.comparePrice}>₹{compareAtPrice.toLocaleString('en-IN')}</Text> : null}</View>
-                {hasDiscount ? <Text style={s.discountLine}>{discountPercent}% OFF</Text> : null}
-                <Text numberOfLines={3} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
+                <Text numberOfLines={2} style={[s.productName, !availableForSale && s.unavailableDetails]}>{product.title}</Text>
               </View>;
             })}
             {!visibleProducts.length ? <Text style={s.empty}>No products match this filter.</Text> : null}
@@ -200,7 +227,7 @@ export function CategoryCollectionPage({ category, selectedCollection, previews,
             {loadingMore ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={s.loadMoreButtonText}>Load more</Text>}
           </Pressable> : null}
         </ScrollView>
-        {showProductScrollHint && (visibleProducts.length > 4 || hasNextPage) ? <View pointerEvents="none" style={s.productScrollHint}><Ionicons name="chevron-down" size={16} color="#3F72E5" /><Text style={s.productScrollHintText}>Scroll for more</Text></View> : null}
+        {showProductScrollHint && (visibleProducts.length > 4 || hasNextPage) ? <Pressable accessibilityRole="button" accessibilityLabel="Scroll for more products" onPress={scrollFurther} style={s.productScrollHint}><Ionicons name="chevron-down" size={16} color="#3F72E5" /><Text style={s.productScrollHintText}>Scroll for more</Text></Pressable> : null}
       </View>
     </View>
     <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={() => setFilterVisible(false)}>
@@ -284,20 +311,26 @@ const s = StyleSheet.create({
   productScroll: { paddingTop: 12, paddingHorizontal: 8, paddingBottom: 30 },
   productScrollHint: { position: 'absolute', left: '50%', bottom: 10, minWidth: 112, height: 34, marginLeft: -56, paddingHorizontal: 12, borderWidth: 1, borderColor: '#D4DEEC', borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.96)', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 5, elevation: 5 },
   productScrollHintText: { color: '#3F72E5', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '800' },
-  collectionLoader: { height: 180, alignItems: 'center', justifyContent: 'center' },
+  collectionLoader: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 16, paddingTop: 2 },
+  skeletonCard: { width: '48.2%' },
+  skeletonImage: { width: '100%', aspectRatio: 0.78, borderRadius: 9, backgroundColor: '#DCE5F0' },
+  skeletonDetails: { paddingTop: 10 },
+  skeletonPrice: { width: '54%', height: 19, borderRadius: 6, backgroundColor: '#DCE5F0' },
+  skeletonTitle: { width: '94%', height: 11, marginTop: 9, borderRadius: 5, backgroundColor: '#E5EBF3' },
+  skeletonTitleShort: { width: '68%', marginTop: 6 },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 18 },
-  productCard: { width: '48.2%', marginBottom: 4, backgroundColor: '#FFFFFF' },
-  productImageBlock: { width: '100%', aspectRatio: 0.88, overflow: 'hidden', borderWidth: 1.25, borderColor: '#C9D3E1', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  productImage: { position: 'absolute', left: '5%', bottom: 4, width: '90%', height: '82%' },
+  productCard: { width: '48.2%', marginBottom: 0, backgroundColor: '#FFFFFF' },
+  productImageBlock: { width: '100%', aspectRatio: 0.78, overflow: 'hidden', borderWidth: 1.25, borderColor: '#C9D3E1', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  productImage: { position: 'absolute', left: '7%', bottom: 2, width: '86%', height: '78%' },
   unavailableImage: { opacity: 0.42 },
   unavailableDetails: { opacity: 0.48 },
   discountBadge: { position: 'absolute', top: 0, left: 0, minWidth: 38, height: 22, paddingHorizontal: 6, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D83434' },
   discountBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
   comingSoonBadge: { position: 'absolute', top: 0, left: 0, height: 24, paddingHorizontal: 8, borderTopLeftRadius: 9, borderBottomRightRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B98725' },
   comingSoonBadgeText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 10, fontWeight: '900' },
-  productActionDock: { position: 'relative', zIndex: 4, height: 30, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
-  imageActionButton: { position: 'absolute', top: -18, right: 0, minWidth: 58, height: 40, paddingHorizontal: 10, borderWidth: 1.5, borderColor: '#3F72E5', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 4, elevation: 4 },
-  quantityAction: { width: 58, minWidth: 58, paddingHorizontal: 2, flexDirection: 'row', justifyContent: 'space-between' },
+  productActionDock: { position: 'relative', zIndex: 4, height: 0, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', backgroundColor: 'transparent' },
+  imageActionButton: { position: 'absolute', top: -36, right: 0, minWidth: 56, height: 36, paddingHorizontal: 9, borderWidth: 1.5, borderColor: '#3F72E5', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3F72E5', shadowColor: '#0A254A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 4, elevation: 4 },
+  quantityAction: { width: 56, minWidth: 56, paddingHorizontal: 2, flexDirection: 'row', justifyContent: 'space-between' },
   quantityTap: { minWidth: 17, height: '100%', alignItems: 'center', justifyContent: 'center' },
   quantityText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   imageActionText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 12, fontWeight: '900' },
@@ -309,12 +342,11 @@ const s = StyleSheet.create({
   notifyToast: { position: 'absolute', right: -8, bottom: 30, minWidth: 122, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, alignItems: 'center', backgroundColor: '#1A1C1D', shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 5 },
   notifyToastText: { color: '#FFFFFF', fontFamily: 'Inter_400Regular', fontSize: 11, fontWeight: '700' },
   heart: { position: 'absolute', right: 4, top: 4, width: 28, height: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  productName: { minHeight: 54, marginTop: 2, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  priceRow: { minHeight: 24, marginTop: 4, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 },
-  price: { color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 18, fontWeight: '900' },
+  productName: { minHeight: 36, marginTop: 1, color: '#2C2D2E', fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  priceRow: { minHeight: 20, marginTop: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 },
+  price: { color: '#D83434', fontFamily: 'Inter_400Regular', fontSize: 16, fontWeight: '900' },
   discountedPrice: { color: '#D83434' },
   comparePrice: { flexShrink: 1, color: '#666666', fontFamily: 'Inter_400Regular', fontSize: 10, textDecorationLine: 'line-through' },
-  discountLine: { color: '#E53935', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 14, fontWeight: '900' },
   empty: { width: '100%', marginTop: 50, color: '#777777', textAlign: 'center' },
   loadMoreButton: { alignSelf: 'center', minWidth: 140, height: 44, marginTop: 24, paddingHorizontal: 24, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E53935', shadowColor: '#7A1714', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 7 },
   loadMoreButtonDisabled: { opacity: 0.65 },

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { ShopifyCollectionPreview, ShopifyMenuItem } from '../src/shopify';
 
 type Props = {
@@ -13,15 +13,24 @@ function CollectionImage({ imageUrl, loaded }: { imageUrl?: string; loaded: bool
   const [imageReady, setImageReady] = useState(false);
   useEffect(() => setImageReady(false), [imageUrl]);
 
-  if (!loaded || !imageUrl) return <CartonLoader />;
+  if (!loaded || !imageUrl) return <CollectionSkeleton />;
   return <View style={s.artwork}>
-    {!imageReady ? <CartonLoader /> : null}
+    {!imageReady ? <CollectionSkeleton /> : null}
     <Image source={{ uri: imageUrl }} style={[s.image, !imageReady && s.imageHidden]} resizeMode="contain" onLoad={() => setImageReady(true)} onError={() => setImageReady(false)} />
   </View>;
 }
 
-function CartonLoader() {
-  return <View accessibilityLabel="Loading collection image" style={s.loaderBox}><MaterialCommunityIcons name="package-variant-closed" size={26} color="#B97435" /></View>;
+function CollectionSkeleton() {
+  const opacity = useRef(new Animated.Value(0.42)).current;
+  useEffect(() => {
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(opacity, { toValue: 0.9, duration: 680, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.42, duration: 680, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+  return <View accessibilityLabel="Loading collection image" style={s.loaderBox}><Animated.View style={[s.loaderSkeleton, { opacity }]} /></View>;
 }
 
 export function CategoriesPage({ menuItems, previews, onSelectCollection }: Props) {
@@ -76,6 +85,7 @@ const s = StyleSheet.create({
   image: { width: '100%', height: '100%', transform: [{ scale: 1.24 }] },
   artwork: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   imageHidden: { position: 'absolute', opacity: 0.01 },
-  loaderBox: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  loaderBox: { width: '100%', height: '100%', padding: 10 },
+  loaderSkeleton: { flex: 1, borderRadius: 10, backgroundColor: '#DCE5F0' },
   collectionLabel: { minHeight: 34, marginTop: 7, color: '#1A1C1D', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 14, fontWeight: '700', textAlign: 'center' },
 });

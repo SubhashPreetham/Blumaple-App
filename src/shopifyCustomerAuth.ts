@@ -8,7 +8,11 @@ WebBrowser.maybeCompleteAuthSession();
 
 const TOKEN_KEY = 'blumaple.shopify.customerAccessToken';
 const GOOGLE_TOKEN_KEY = 'blumaple.google.accessToken';
+// Legacy demo-session key is cleared on launch so testing always begins at login.
+const DEMO_LOGIN_KEY = 'blumaple.demoLogin';
 const CUSTOMER_AUTH_SCHEME = 'shop.88771821938.blumaple';
+const DEMO_LOGIN_EMAIL = 'swaroopa@peachimports.com';
+const DEMO_LOGIN_PASSWORD = 'Peach@2026';
 
 export type ShopifyCustomer = {
   id: string;
@@ -108,6 +112,17 @@ const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").t
     setCustomer({ id: `google:${profile.sub}`, displayName: profile.name || profile.email, firstName: profile.given_name || null, lastName: profile.family_name || null, emailAddress: { emailAddress: profile.email }, authProvider: 'google' });
   }, []);
 
+  const loadDemoCustomer = useCallback(() => {
+    setAccessToken('demo:swaroopa-peachimports');
+    setCustomer({
+      id: 'demo:swaroopa-peachimports',
+      displayName: 'Swaroopa',
+      firstName: 'Swaroopa',
+      emailAddress: { emailAddress: DEMO_LOGIN_EMAIL },
+      authProvider: 'demo',
+    });
+  }, []);
+
   const loadCustomer = useCallback(async (token: string, config: Discovery) => {
     const result = await fetch(config.customerApiEndpoint, {
       method: 'POST',
@@ -144,6 +159,7 @@ const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").t
     let active = true;
     (async () => {
       try {
+        await SecureStore.deleteItemAsync(DEMO_LOGIN_KEY);
         if (!clientId || !customerAccountUrl) throw new Error('Blumaple customer login is not configured.');
         const shopId = customerAccountUrl.match(/shopify\.com\/(\d+)\/account/i)?.[1];
         if (!shopId) throw new Error('Blumaple customer account URL is invalid.');
@@ -170,7 +186,7 @@ const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").t
       }
     })();
     return () => { active = false; };
-  }, [clientId, customerAccountUrl, customerApiVersion, loadCustomer, loadGoogleCustomer, loadLegacyCustomer]);
+  }, [clientId, customerAccountUrl, customerApiVersion, loadCustomer, loadDemoCustomer, loadGoogleCustomer, loadLegacyCustomer]);
 
   useEffect(() => {
     if (googleResponse?.type !== 'success') return;
@@ -208,6 +224,10 @@ const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").t
     }
     setLoading(true);
     try {
+      if (__DEV__ && identifier.trim().toLowerCase() === DEMO_LOGIN_EMAIL && password === DEMO_LOGIN_PASSWORD) {
+        loadDemoCustomer();
+        return;
+      }
       const data = await storefrontRequest(LEGACY_LOGIN_MUTATION, { input: { email: identifier.trim().toLowerCase(), password } });
       const loginResult = data?.customerAccessTokenCreate;
       const loginError = loginResult?.customerUserErrors?.[0]?.message;
@@ -218,7 +238,7 @@ const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").t
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to sign in.');
     } finally { setLoading(false); }
-  }, [loadLegacyCustomer, storefrontRequest]);
+  }, [loadDemoCustomer, loadLegacyCustomer, storefrontRequest]);
 
   const loginWithGoogle = useCallback(async () => {
     setError(null);
@@ -235,6 +255,7 @@ const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").t
   const logout = useCallback(async () => {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(GOOGLE_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(DEMO_LOGIN_KEY);
     setAccessToken(null);
     setCustomer(null);
   }, []);
